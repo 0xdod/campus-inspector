@@ -1,8 +1,8 @@
 name: Verify and publish inspector
 on:
   push:
-  pull_request:
-  workflow_dispatch:
+    branches:
+      - dev
 permissions:
   contents: read
 concurrency:
