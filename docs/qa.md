@@ -2,9 +2,22 @@
 
 Automated tests use deterministic local fixture Campus servers and generated RSA keys. They do not prove live staging behavior. Supply live values only through your deployment configuration and operator forms, never committed fixtures.
 
-## Authorized reference preparation
+## Normal student and administrator launches
 
-The inspector cannot mint Campus references and has no Campus DB/Redis credentials. An authorized development/test harness must call the backend's injected Campus Apps service `CreateLaunchReference` with the original authenticated UserID, TenantID, AppID, ClientID, InstallationPK, InstallationID, LaunchType (student/admin), and TargetLinkURI. The target must equal this app's registered launch URL and approved callback (`<PUBLIC_URL>/oidc/callback`). Each reference lasts five minutes, is opaque and single-use. No unauthenticated fixture route is added.
+Register the inspector’s `/oidc/initiate` URL and approved `/oidc/callback` URL in Campus, save the returned client/installation IDs, and activate the matching saved profile. Use the numeric app ID returned by registration for these requests; client and installation IDs are different identifiers.
+
+Against the profile’s Campus request base, use your authorized API client to call either:
+
+- `GET /students/campus-apps/{appId}/launch` with a direct student session (Bearer or student session cookie). No RBAC permission is required.
+- `GET /admin/campus-apps/{appId}/launch` with a direct administrator session (Bearer or admin session cookie) and system-scoped `campus_apps.app.read`.
+
+Impersonation is rejected. The app and tenant installation must be active. Both endpoints return HTTP 200 with an initiation URL string in the standard envelope’s `data` field; they do not redirect automatically. Open that exact URL in a browser within five minutes. The backend binds it to the authenticated user, tenant, app, installation and launch type, and supplies `iss`, `login_hint`, `client_id`, `target_link_uri`, `installation_id` and `login_message_hint`. The inspector’s existing public initiation route starts the correlated OIDC flow and verifies the form-post callback. No manual user ID/reference entry or custom harness is needed for this normal path. Request a new URL for every launch; references are single-use.
+
+Keep Campus session credentials in the authorized API client, outside the inspector. Do not save full initiation URLs or references in QA evidence. The operator must sign in to view the resulting inspection; a public callback never creates an operator session.
+
+## Advanced reference preparation
+
+The inspector cannot mint Campus references and has no Campus DB/Redis credentials. For controlled fixtures that cannot be prepared with the normal launch endpoints, an authorized development/test harness can call the backend's injected Campus Apps service `CreateLaunchReference` with the original authenticated UserID, TenantID, AppID, ClientID, InstallationPK, InstallationID, LaunchType (student/admin), and TargetLinkURI. The target must equal this app's registered launch URL and approved callback (`<PUBLIC_URL>/oidc/callback`). Each reference lasts five minutes, is opaque and single-use. No unauthenticated fixture route is added. Use the Launch inspector’s manual form for these prepared references and nonce overrides.
 
 Prepare independent fixtures for valid issuance, expired reference, consumed reference, revoked membership/disabled app or tenant (403), and missing resources (404). Never treat a random invalid reference as proof of expiry or consumption. Nonce replay needs **two fresh references** and the same advanced nonce override; replaying inspector callback state only tests inspector correlation.
 

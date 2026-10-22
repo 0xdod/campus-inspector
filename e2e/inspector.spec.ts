@@ -48,6 +48,15 @@ test("operator setup, real browser form-post, OAuth and redacted export", async 
   await page
     .getByRole("button", { name: "Launch inspector", exact: true })
     .click();
+  await expect(
+    page.getByRole("heading", { name: "Launch from Campus" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("GET /students/campus-apps/{appId}/launch", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("GET /admin/campus-apps/{appId}/launch", { exact: true }),
+  ).toBeVisible();
   await page.getByLabel("Original user ID").fill("7");
   await page
     .getByLabel("Fresh prepared launch reference")
@@ -304,6 +313,9 @@ test("public form-post callback works without operator cookies and never creates
   const query = new URLSearchParams({
     iss: "https://fixture-campus.example/",
     login_hint: "7",
+    client_id: "fixture-client",
+    installation_id: "fixture-install",
+    target_link_uri: "http://localhost:8090/oidc/callback",
     login_message_hint: "fixture-reference-no-cookie-" + Date.now(),
   });
   await page.goto("http://localhost:8090/oidc/initiate?" + query);

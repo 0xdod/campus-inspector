@@ -68,7 +68,9 @@ export function Overview({
           <li>
             <span>02</span>
             <strong>Start a launch</strong>
-            <p>Use the original user ID and a fresh prepared reference.</p>
+            <p>
+              Open the initiation URL from a Campus student or admin launch.
+            </p>
             <button
               className="text-button"
               onClick={() => onNavigate("launch")}

@@ -1,5 +1,6 @@
 "use client";
 import { SavedProfiles } from "./SavedProfiles";
+import { BackendLaunchGuide } from "./BackendLaunchGuide";
 import { useState } from "react";
 import type { Bootstrap } from "@/lib/contracts";
 import type { RequestFn } from "./Console";
@@ -77,6 +78,11 @@ export function Setup({
       </section>
       <div>
         <SavedProfiles boot={boot} request={request} onSave={onSave} />
+        <section className="panel">
+          <span className="eyebrow">START A REAL LAUNCH</span>
+          <h2>Launch from Campus</h2>
+          <BackendLaunchGuide />
+        </section>
         <section className="panel">
           <h3>Platform key observations</h3>
           <p>{boot.jwksObservation.status}</p>

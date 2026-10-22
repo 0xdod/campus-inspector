@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { BackendLaunchGuide } from "./BackendLaunchGuide";
 import { scenarios, type InspectionResult } from "@/lib/contracts";
 import type { RequestFn } from "./Console";
 export function Playgrounds({
@@ -25,7 +26,7 @@ export function Playgrounds({
         </span>
         <h2>
           {kind === "launch"
-            ? "Start an OIDC launch"
+            ? "Manual OIDC launch"
             : "Exercise the token endpoint"}
         </h2>
         {!ready && (
@@ -87,8 +88,8 @@ export function Playgrounds({
                 maxLength={2048}
               />
               <p className="caption">
-                Five-minute, single-use reference from an authorized Campus
-                harness.
+                For advanced QA with a prepared reference. For a normal launch,
+                follow the Campus launch instructions alongside this form.
               </p>
               <details>
                 <summary>Advanced · nonce replay QA</summary>
@@ -147,17 +148,12 @@ export function Playgrounds({
         <span className="eyebrow">BEFORE YOU RUN</span>
         <h2>
           {kind === "launch"
-            ? "A real launch needs real context."
+            ? "Launch from Campus"
             : "Expected behavior, measured."}
         </h2>
         {kind === "launch" ? (
           <>
-            <p>
-              The inspector cannot mint Campus launch references. An authorized
-              development harness must call <code>CreateLaunchReference</code>{" "}
-              for the matching user, tenant, app, installation, and approved
-              callback.
-            </p>
+            <BackendLaunchGuide />
             <p>
               If Campus rejects the launch before callback, your browser stays
               on its JSON error. The inspector cannot observe that response or
