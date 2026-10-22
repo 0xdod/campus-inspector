@@ -1,4 +1,4 @@
-name: Verify and publish inspector
+name: Verify, publish and deploy inspector
 on:
   push:
     branches:
@@ -77,3 +77,28 @@ jobs:
             printf '\n```text\n%s\n```\n' "$TAGS"
             printf '\nPinned image: `%s@%s`\n' "$IMAGE" "$DIGEST"
           } >> "$GITHUB_STEP_SUMMARY"
+  deploy:
+    name: Trigger Dokploy deployment
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: POST deployment webhook
+        env:
+          DEPLOY_WEBHOOK: ${{ vars.DEPLOY_WEBHOOK }}
+        run: |
+          if [ -z "$DEPLOY_WEBHOOK" ]; then
+            echo '::error::Set the DEPLOY_WEBHOOK Actions variable to your Dokploy deployment webhook URL.'
+            exit 1
+          fi
+          echo "::add-mask::$DEPLOY_WEBHOOK"
+          status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --connect-timeout 10 --max-time 60 --request POST "$DEPLOY_WEBHOOK") || {
+            echo '::error::Could not reach the Dokploy deployment webhook.'
+            exit 1
+          }
+          case "$status" in
+            2??) echo 'Dokploy deployment requested.' ;;
+            *) echo "::error::Dokploy deployment webhook returned HTTP $status."; exit 1 ;;
+          esac
