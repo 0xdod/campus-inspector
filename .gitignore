@@ -1,0 +1,12 @@
+node_modules/
+.next/
+.env*
+!.env.example
+data/
+*.pem
+*.sqlite*
+*.tsbuildinfo
+playwright-report/
+test-results/
+coverage/
+.DS_Store
