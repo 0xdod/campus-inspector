@@ -24,6 +24,11 @@ export function readConfig(
     } catch {
       throw new Error(`Invalid ${name}`);
     }
+    if (u.protocol === "http:" && loopback(u.hostname) && !local) {
+      throw new Error(
+        `${name} uses loopback HTTP. Set ALLOW_LOCAL_HTTP=true for local development, or configure an HTTPS URL.`,
+      );
+    }
     if (
       u.username ||
       u.password ||

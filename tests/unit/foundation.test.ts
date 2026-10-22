@@ -132,3 +132,20 @@ it("canonicalizes the public origin while preserving exact issuer", () => {
   expect(c.publicUrl).toBe("https://inspector.example");
   expect(c.issuer).toBe("https://Issuer.Example/");
 });
+it("explains the opt-in required for a loopback HTTP backend behind an HTTPS inspector", () => {
+  expect(() =>
+    readConfig({
+      ...env,
+      PUBLIC_URL: "https://inspector.example",
+      ALLOW_LOCAL_HTTP: "false",
+    }),
+  ).toThrow(
+    "CAMPUS_BASE_URL uses loopback HTTP. Set ALLOW_LOCAL_HTTP=true for local development, or configure an HTTPS URL.",
+  );
+  const configured = readConfig({
+    ...env,
+    PUBLIC_URL: "https://inspector.example",
+  });
+  expect(configured.campusBase).toBe("http://localhost:8081/api/backend");
+  expect(configured.issuer).toBe("https://issuer.example/");
+});
