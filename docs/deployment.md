@@ -1,0 +1,15 @@
+# Docker deployment
+
+Use one replica of the multi-stage image with a persistent named volume mounted at `/data`. The image runs as UID/GID 1000, with a read-only root filesystem, all capabilities dropped and no-new-privileges. Compose supplies writable, size-bounded `/tmp` and `.next/cache` tmpfs mounts. A new Docker named volume inherits the image's `/data` ownership; pre-provisioned/bind-mounted data must be writable by UID 1000. The app sets directory mode 0700, key/database mode 0600. Back up the whole data directory consistently (including SQLite WAL); protect backups like credentials. Replacing this volume changes the app signing key and loses registration/history.
+
+1. Build with `docker compose build` or `docker compose up -d --build`.
+2. Set `.env` with canonical public HTTPS origin, trusted Campus request base and exact issuer, a strong operator password; omit `ALLOW_LOCAL_HTTP` outside local QA. Compose overrides DATA_DIR to `/data`.
+3. Terminate TLS at ingress, forward to loopback 8090 and restrict ingress to the expected hostname. The server trusts **no forwarded headers** for authentication, origin checks, request targets, rate-limit identities or canonical redirects. Configure the external URL explicitly; preserve Origin for operator mutations. Public callback/initiation must bypass ingress operator authentication. Do not apply blanket CSRF middleware to these integration endpoints.
+4. Expose `/healthz` for minimal process readiness, not Campus health. The image healthcheck uses its configured PORT. Compose publishes only loopback; change ingress wiring deliberately for remote reverse proxies. In Docker, `localhost` Campus destinations refer to the container itself; use an actual public Campus backend URL for integrations.
+5. Run `npm run test:docker` to verify the image under the actual restrictions and persistence across restart. No paid hosting, live registration, external publishing or production fixture mutation is performed by this command.
+
+Use a real HTTPS tunnel for local Campus-to-inspector JWKS calls; configure PUBLIC_URL to the tunnel origin and register its endpoints. Never disable Campus SSRF/TLS or use internal JWKS destinations. PUBLIC_URL is origin-only; deploy this application at the origin root. The Campus backend request base may contain a gateway prefix.
+
+Changing password requires restarting the process. Existing sessions survive restarts and remain valid until their eight-hour expiry or sign-out; remove/revoke sessions administratively when rotating a potentially compromised password. Stop before offline maintenance. SQLite's schema version is in schema_migrations; startup applies the bundled initial migration idempotently. Future migrations must preserve durable records transactionally.
+
+Configure ingress access logs to omit query strings and request bodies for integration and operator endpoints. Launch initiation URLs can contain a reference; callbacks contain credentials. Next incoming-request logging is disabled in this app. Apply request-size and connection deadlines at ingress as well as the server's bounded parsers.
