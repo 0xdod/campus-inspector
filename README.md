@@ -29,6 +29,8 @@ docker compose up -d --build
 
 Browser tests start their own production app on 8090 and deterministic Campus fixture on 8091. Stop any server using those ports first. Fixtures use generated keys and test-only identifiers, never staging credentials. Docker verification builds a local image, creates its own temporary named volume/container, verifies persistence, and removes those temporary resources. It does not deploy externally.
 
+GitHub Actions publishes verified container images to `ghcr.io/0xdod/campus-inspector` for the default branch, `dev`, and `v*` tags. Use `docker compose -f compose.ghcr.yaml up -d` to pull a published image, or reference it in Dokploy with persistent storage at `/data`. See [GHCR tags, registry access and deployment](docs/deployment.md#build-and-publish-images-with-github-actions).
+
 ## Configure the default environment
 
 | Server-only variable | Purpose |

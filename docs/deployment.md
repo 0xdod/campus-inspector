@@ -35,6 +35,43 @@ For updates, fetch your new code and repeat the same `up -d --build` command. To
 
 If your VPS already runs Nginx, Caddy, or another proxy on ports 80/443, use only `docker compose up -d --build` and forward your HTTPS hostname to `127.0.0.1:8090` from that proxy. Preserve the original `Origin` header and allow unauthenticated access to the public integration endpoints. Keep the app's existing operator sign-in.
 
+## Build and publish images with GitHub Actions
+
+The [CI workflow](../.github/workflows/ci.yaml) runs the existing typecheck, lint, tests, production build, browser tests and Docker smoke test, plus a production dependency audit. A successful run publishes to `ghcr.io/0xdod/campus-inspector` on pushes to the repository's default branch, pushes to `dev`, and tags beginning with `v`. You can also use **Actions → Verify and publish inspector → Run workflow** once the workflow is available on the default branch. Pull requests run verification without publishing.
+
+The workflow builds both `linux/amd64` and `linux/arm64`, using the existing Dockerfile. It authenticates with GitHub's built-in `GITHUB_TOKEN` and grants `packages: write` only to the publishing job. No registry password or app deployment secrets are required in Actions. Image names follow the repository name automatically and are lowercased; if you fork or rename the repository, update the deployment image reference accordingly.
+
+| Tag | Published from |
+| --- | --- |
+| `dev` | The `dev` branch |
+| `latest` | The repository's default branch only |
+| `v1.2.3` | A Git tag named `v1.2.3` |
+| `sha-<full-commit-sha>` | Each published commit |
+
+Branch tags have `/` replaced with `-` when necessary. The Actions run summary also provides the exact image digest for reproducible deployments and rollbacks. A successful build for both architectures does not imply both architectures have had native runtime testing; the Docker smoke test runs on the GitHub runner's architecture.
+
+### Pull the image with Compose
+
+Use [compose.ghcr.yaml](../compose.ghcr.yaml) **instead of** `compose.yaml`; it contains no build instruction. Prepare `.env` as above, optionally set `IMAGE_TAG=dev`, `IMAGE_TAG=latest`, or a published version/commit tag, then run:
+
+```sh
+docker compose -f compose.ghcr.yaml up -d
+```
+
+To use the optional Caddy HTTPS proxy:
+
+```sh
+docker compose -f compose.ghcr.yaml -f compose.vps.yaml up -d
+```
+
+The Compose file pulls the selected image on each `up`. Keep the same Compose project name and persistent volume when changing between local builds and registry images. Avoid `down --volumes` if you want to preserve saved apps and signing keys. For a rollback, select a previously published version/commit tag or use the digest from the Actions summary as the service's full image reference, then redeploy with the same data volume.
+
+### Use the image in Dokploy
+
+In a Docker image application, set the image to `ghcr.io/0xdod/campus-inspector:dev` (or a published version/digest), configure the app environment, use container port `8090`, and mount persistent storage at `/data`. Run one replica. Alternatively, deploy `compose.ghcr.yaml` as a Compose application and configure Dokploy routing to the `inspector` service on port `8090`. Dokploy or your tunnel handles ingress; omit the Caddy overlay in this case. Updating an image tag in GHCR does not itself redeploy Dokploy; pull/redeploy through Dokploy when ready.
+
+New GHCR packages are private by default. After the first successful publication, either make the package public in its GitHub package settings for anonymous pulls, or configure a `ghcr.io` registry credential in Dokploy using your GitHub username and a personal access token (classic) with `read:packages` and permission to read this package. Keep this pull credential in Dokploy's registry settings, outside Compose and Git. Organization SSO authorization may also be required. See [GitHub's registry authentication and visibility documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
+
 ## Container behavior and maintenance
 
 Use one replica of the multi-stage image with a persistent named volume mounted at `/data`. The image runs as UID/GID 1000, with a read-only root filesystem, all capabilities dropped and no-new-privileges. Compose supplies writable, size-bounded `/tmp` and `.next/cache` tmpfs mounts. A new Docker named volume inherits the image's `/data` ownership; pre-provisioned/bind-mounted data must be writable by UID 1000. The app sets directory mode 0700, key/database mode 0600. Back up the whole data directory consistently (including SQLite WAL); protect backups like credentials. Replacing this volume changes the app signing key and loses registration/history.

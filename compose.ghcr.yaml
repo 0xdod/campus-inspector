@@ -1,0 +1,24 @@
+# Standalone alternative to compose.yaml: pulls the published image without building.
+services:
+  inspector:
+    image: ghcr.io/0xdod/campus-inspector:${IMAGE_TAG:-dev}
+    pull_policy: always
+    init: true
+    ports:
+      - "127.0.0.1:8090:8090"
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      PORT: "8090"
+      ALLOW_LOCAL_HTTP: "false"
+    volumes:
+      - inspector-data:/data
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,uid=1000,gid=1000
+      - /app/.next/cache:rw,noexec,nosuid,size=64m,uid=1000,gid=1000
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+volumes:
+  inspector-data:
