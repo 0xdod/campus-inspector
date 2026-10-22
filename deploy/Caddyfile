@@ -1,0 +1,17 @@
+{
+    log default {
+        format filter {
+            wrap json
+            fields {
+                request delete
+            }
+        }
+    }
+}
+
+# PUBLIC_URL must be an HTTPS origin, for example https://inspector.example.com.
+{$PUBLIC_URL} {
+    reverse_proxy inspector:8090
+}
+
+# Access logging is disabled; runtime error logs also omit request metadata.

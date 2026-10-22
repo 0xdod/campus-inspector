@@ -1,0 +1,23 @@
+# Use with compose.yaml: docker compose -f compose.yaml -f compose.vps.yaml up -d --build
+services:
+  inspector:
+    environment:
+      ALLOW_LOCAL_HTTP: "false"
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      PUBLIC_URL: ${PUBLIC_URL:?Set PUBLIC_URL to your public HTTPS origin in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      inspector:
+        condition: service_healthy
+volumes:
+  caddy-data:
+  caddy-config:
