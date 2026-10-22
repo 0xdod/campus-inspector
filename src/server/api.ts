@@ -14,6 +14,7 @@ import { bodyJSON, fail, handle, json, textID } from "./http";
 import { startLaunch, launchSchema } from "./launches/launch";
 import { oauthSchema, runOAuth } from "./oauth/scenarios";
 import { jwksObservation } from "./crypto/verify";
+import { saveProfile, saveRegistrationProfile } from "./profiles/service";
 import { exportEvidence } from "./evidence/redaction";
 export function registrationJSON(publicUrl: string) {
   return {
@@ -31,6 +32,8 @@ const methods: Record<string, string[]> = {
   session: ["POST", "DELETE"],
   bootstrap: ["GET"],
   registration: ["PUT"],
+  profiles: ["GET", "POST"],
+  "active-profile": ["PUT"],
   history: ["GET"],
   evidence: ["GET"],
   launch: ["POST"],
@@ -40,7 +43,8 @@ export function api(req: Request) {
   return handle(async () => {
     const path = new URL(req.url).pathname.slice("/api/".length);
     const isDetail = path.startsWith("history/");
-    const allowed = isDetail ? ["GET"] : methods[path];
+    const profileMatch = /^profiles\/([^/]+)$/.exec(path);
+    const allowed = profileMatch ? ["PUT"] : isDetail ? ["GET"] : methods[path];
     if (!allowed) fail(404, "path", "Resource not found");
     if (!allowed.includes(req.method))
       return json(
@@ -81,27 +85,56 @@ export function api(req: Request) {
         campusBase: c.campusBase,
         issuer: c.issuer,
         csrf: session.csrf,
-        registration: s.registration(),
+        registration: c.profile
+          ? {
+              client_id: c.profile.client_id,
+              ...(c.profile.installation_id
+                ? { installation_id: c.profile.installation_id }
+                : {}),
+            }
+          : s.registration(),
+        profiles: s.profiles(),
+        activeProfileId: c.profile?.id ?? null,
         registrationJSON: registrationJSON(c.publicUrl),
-        jwksObservation: jwksObservation(),
+        jwksObservation: jwksObservation(c),
       });
+    if (path === "profiles") {
+      if (req.method === "GET") return json(s.profiles());
+      return json(saveProfile(c, s, await bodyJSON(req)), 201);
+    }
+    if (profileMatch) {
+      const id = profileMatch[1];
+      if (!/^[A-Za-z0-9-]{1,64}$/.test(id))
+        fail(400, "id", "id must be a valid profile identifier");
+      return json(saveProfile(c, s, await bodyJSON(req), id));
+    }
+    if (path === "active-profile") {
+      const body = z
+        .object({ profile_id: z.string().min(1).max(64) })
+        .strict()
+        .parse(await bodyJSON(req));
+      return json(s.activateProfile(body.profile_id));
+    }
     if (path === "registration") {
       const body = z
         .object({ client_id: textID, installation_id: textID.optional() })
         .strict()
         .parse(await bodyJSON(req));
-      s.setRegistration(body);
+      saveRegistrationProfile(c, s, body);
       return json(s.registration());
     }
     if (path === "history")
       return json(
-        s.history().map(({ id, kind, status, createdAt, scenario }) => ({
-          id,
-          kind,
-          status,
-          createdAt,
-          scenario,
-        })),
+        s
+          .history()
+          .map(({ id, kind, status, createdAt, scenario, profile }) => ({
+            id,
+            kind,
+            status,
+            createdAt,
+            scenario,
+            profile,
+          })),
       );
     if (isDetail) {
       const id = path.slice("history/".length);

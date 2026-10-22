@@ -25,6 +25,15 @@ export function RunDetail({
         </div>
         <span className={"badge " + run.status}>{run.status}</span>
       </div>
+      {run.profile && (
+        <p className="caption">
+          Profile at run time: <strong>{run.profile.name}</strong>
+          <br />
+          Request base <code>{run.profile.campusBase}</code>
+          <br />
+          Expected issuer <code>{run.profile.issuer}</code>
+        </p>
+      )}
       {run.expected && (
         <p>
           Expected HTTP {run.expected.status} {run.expected.error}

@@ -17,7 +17,11 @@ import type { CheckResult } from "@/lib/contracts";
 let observation: { status: string; observedAt?: string; keyCount?: number } = {
   status: "Not fetched",
 };
-export const jwksObservation = () => observation;
+let observationSource = "";
+export const jwksObservation = (config?: Config) =>
+  !config || observationSource === config.campusBase + "\n" + config.issuer
+    ? observation
+    : { status: "Not fetched" };
 export async function platformKeys(c: Config): Promise<JWK[]> {
   try {
     const res = await campusRequest(c, "/.well-known/jwks.json");
@@ -58,6 +62,7 @@ export async function platformKeys(c: Config): Promise<JWK[]> {
       await importJWK(k, "RS256");
       keys.push(k);
     }
+    observationSource = c.campusBase + "\n" + c.issuer;
     observation = {
       status: "Fetched public signing keys",
       observedAt: new Date().toISOString(),
@@ -65,6 +70,7 @@ export async function platformKeys(c: Config): Promise<JWK[]> {
     };
     return keys;
   } catch (error) {
+    observationSource = c.campusBase + "\n" + c.issuer;
     observation = {
       status: "Unavailable or rejected",
       observedAt: new Date().toISOString(),

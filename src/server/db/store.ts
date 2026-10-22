@@ -2,8 +2,14 @@ import "server-only";
 import Database from "better-sqlite3";
 import { mkdirSync, readFileSync, chmodSync } from "node:fs";
 import { join } from "node:path";
-import { createHash, randomBytes } from "node:crypto";
-import type { InspectionResult, Registration } from "@/lib/contracts";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { fail } from "@/server/http";
+import type {
+  InspectionResult,
+  Registration,
+  AppProfile,
+  ProfileInput,
+} from "@/lib/contracts";
 export const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 export const secret = () => randomBytes(32).toString("base64url");
@@ -14,6 +20,9 @@ export type LaunchSnapshot = {
   installation?: string;
   nonce: string;
   expires: number;
+  campusBase?: string;
+  issuer?: string;
+  profile?: InspectionResult["profile"];
 };
 export class Store {
   readonly db: Database.Database;
@@ -29,6 +38,13 @@ export class Store {
     this.db.exec(
       readFileSync(join(process.cwd(), "migrations/001_initial.sql"), "utf8"),
     );
+    this.db.exec(
+      readFileSync(
+        join(process.cwd(), "migrations/002_app_profiles.sql"),
+        "utf8",
+      ),
+    );
+    this.db.pragma("foreign_keys = ON");
     this.prune();
   }
   close() {
@@ -48,7 +64,84 @@ export class Store {
         .run();
     })();
   }
+  profiles(): AppProfile[] {
+    const rows = this.db
+      .prepare(
+        "SELECT id,name,campus_base AS campusBase,issuer,client AS client_id,installation AS installation_id,created AS createdAt,updated AS updatedAt FROM app_profiles ORDER BY updated DESC,rowid DESC",
+      )
+      .all() as (AppProfile & { installation_id: string | null })[];
+    return rows.map(({ installation_id, ...row }) => ({
+      ...row,
+      ...(installation_id ? { installation_id } : {}),
+    }));
+  }
+  profile(id: string) {
+    return this.profiles().find((p) => p.id === id);
+  }
+  activeProfile() {
+    const row = this.db
+      .prepare("SELECT profile_id FROM active_profile WHERE id=1")
+      .get() as { profile_id: string } | undefined;
+    return row ? this.profile(row.profile_id) : undefined;
+  }
+  saveProfile(input: ProfileInput, id?: string) {
+    return this.db.transaction(() => {
+      if (id && !this.profile(id)) fail(404, "id", "Saved profile not found");
+      if (!id && this.profiles().length >= 200)
+        fail(422, "profiles", "At most 200 saved profiles are supported");
+      const profileId = id || randomUUID(),
+        now = new Date().toISOString();
+      this.db
+        .prepare(
+          "INSERT INTO app_profiles VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,campus_base=excluded.campus_base,issuer=excluded.issuer,client=excluded.client,installation=excluded.installation,updated=excluded.updated",
+        )
+        .run(
+          profileId,
+          input.name,
+          input.campusBase,
+          input.issuer,
+          input.client_id,
+          input.installation_id || null,
+          now,
+          now,
+        );
+      return this.profile(profileId)!;
+    })();
+  }
+  activateProfile(id: string) {
+    return this.db.transaction(() => {
+      const profile = this.profile(id);
+      if (!profile) fail(404, "profile_id", "Saved profile not found");
+      this.db
+        .prepare(
+          "INSERT INTO active_profile VALUES (1,?) ON CONFLICT(id) DO UPDATE SET profile_id=excluded.profile_id",
+        )
+        .run(id);
+      return profile;
+    })();
+  }
+  importRegistration(config: { campusBase: string; issuer: string }) {
+    this.db.transaction(() => {
+      if (this.profiles().length) return;
+      const registration = this.registration();
+      if (!registration.client_id) return;
+      const profile = this.saveProfile({
+        ...config,
+        ...registration,
+        name: "Imported app",
+      });
+      this.activateProfile(profile.id);
+    })();
+  }
   registration(): Registration {
+    const selected = this.activeProfile();
+    if (selected)
+      return {
+        client_id: selected.client_id,
+        ...(selected.installation_id
+          ? { installation_id: selected.installation_id }
+          : {}),
+      };
     const r = this.db
       .prepare("SELECT client,installation FROM registration WHERE id=1")
       .get() as { client: string; installation: string | null } | undefined;

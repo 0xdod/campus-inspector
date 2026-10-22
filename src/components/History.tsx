@@ -37,7 +37,10 @@ export function History({
                     ? "OIDC launch"
                     : r.scenario?.replaceAll("_", " ")}
                 </strong>
-                <small>{new Date(r.createdAt).toLocaleString()}</small>
+                <small>
+                  {new Date(r.createdAt).toLocaleString()}
+                  {r.profile ? " · " + r.profile.name : ""}
+                </small>
               </span>
               <span className={"badge " + r.status}>{r.status}</span>
               <span aria-hidden="true">→</span>

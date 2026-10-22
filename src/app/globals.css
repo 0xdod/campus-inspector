@@ -875,3 +875,59 @@ input {
 .run-list > button:hover {
   background: var(--accent-soft);
 }
+.profile-manager-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.profile-manager-columns > * {
+  min-width: 0;
+}
+.profile-row {
+  padding: 20px 0;
+  border-top: 1px solid var(--border);
+}
+.profile-row .section-title {
+  margin-bottom: 12px;
+}
+.profile-row h3 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.profile-row dl {
+  margin: 0 0 12px;
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr);
+  gap: 8px 12px;
+}
+.profile-row dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+.profile-row dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.profile-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.two-column .profile-manager-columns {
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+@media (max-width: 760px) {
+  .profile-manager-columns {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .profile-row dl {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .profile-row dd {
+    margin-bottom: 8px;
+  }
+}

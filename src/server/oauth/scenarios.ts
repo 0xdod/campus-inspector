@@ -3,7 +3,8 @@ import { SignJWT, generateKeyPair } from "jose";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { scenarios, type InspectionResult } from "@/lib/contracts";
-import { audience, type Config } from "@/server/config";
+import { audience } from "@/server/config";
+import type { ProfileConfig } from "@/server/profiles/service";
 import type { Store } from "@/server/db/store";
 import type { loadKeys } from "@/server/crypto/keys";
 import { campusRequest, UpstreamError } from "@/server/campus/client";
@@ -24,12 +25,12 @@ export const oauthSchema = z
   })
   .strict();
 export async function runOAuth(
-  c: Config,
+  c: ProfileConfig,
   s: Store,
   keys: Awaited<ReturnType<typeof loadKeys>>,
   input: z.infer<typeof oauthSchema>,
 ) {
-  const r = s.registration();
+  const r = c.profile || s.registration();
   if (!r.client_id)
     fail(422, "client_id", "Save the registered Campus client ID first");
   const { scenario, scope } = input;
@@ -46,6 +47,16 @@ export async function runOAuth(
   const run: InspectionResult = {
     id: randomUUID(),
     kind: "oauth",
+    ...(c.profile
+      ? {
+          profile: {
+            id: c.profile.id,
+            name: c.profile.name,
+            campusBase: c.campusBase,
+            issuer: c.issuer,
+          },
+        }
+      : {}),
     scenario,
     status: "blocked",
     createdAt: new Date().toISOString(),

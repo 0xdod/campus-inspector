@@ -3,14 +3,16 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Bootstrap, InspectionResult } from "@/lib/contracts";
+import { SavedProfiles } from "./SavedProfiles";
 import { Setup } from "./Setup";
 import { Playgrounds } from "./Playgrounds";
 import { History } from "./History";
 import { Overview } from "./Overview";
-type Tab = "overview" | "setup" | "launch" | "oauth" | "history";
+type Tab = "overview" | "setup" | "profiles" | "launch" | "oauth" | "history";
 const nav: { id: Tab; label: string; symbol: string }[] = [
   { id: "overview", label: "Overview", symbol: "◫" },
   { id: "setup", label: "App setup", symbol: "◇" },
+  { id: "profiles", label: "Saved apps", symbol: "▦" },
   { id: "launch", label: "Launch inspector", symbol: "↗" },
   { id: "oauth", label: "OAuth playground", symbol: "⇄" },
   { id: "history", label: "Run history", symbol: "◷" },
@@ -126,7 +128,7 @@ export function Console() {
         </nav>
         <div className="sidebar-note">
           <span className="status-dot" />
-          Single environment
+          One active profile
           <p>
             OIDC launch verification
             <br />
@@ -191,7 +193,10 @@ export function Console() {
               <section className="environment">
                 <span className="env-icon">◎</span>
                 <div>
-                  <span className="eyebrow">CONFIGURED CAMPUS ENVIRONMENT</span>
+                  <span className="eyebrow">
+                    {boot.profiles.find((p) => p.id === boot.activeProfileId)
+                      ?.name || "CONFIGURED CAMPUS ENVIRONMENT"}
+                  </span>
                   <div className="mono">{boot.campusBase}</div>
                   <div className="caption">
                     Expected issuer <code>{boot.issuer}</code>
@@ -207,6 +212,9 @@ export function Console() {
                 <>
                   <Overview boot={boot} runs={runs} onNavigate={setTab} />
                 </>
+              )}
+              {tab === "profiles" && (
+                <SavedProfiles boot={boot} request={request} onSave={refresh} />
               )}
               {tab === "setup" && (
                 <Setup boot={boot} request={request} onSave={refresh} />

@@ -9,3 +9,7 @@ Implement in verified increments: (1) config/storage/auth/setup, (2) launch corr
 Campus source reviewed: internal/features/campus_apps/{dto,service}, docs/qa/campus-apps-{oidc-login,oauth-token}. Roles are strings (empty array permitted). Scope grants are the intersection with campus.webhooks.write. Registration creates an app and tenant installation using authenticated admin context; tenant_id is not a request field. launch_url and target_link_uri must equal the approved callback.
 
 Sources: https://nextjs.org/docs/app/api-reference/file-conventions/route (Node handlers), https://nextjs.org/docs/app/guides/content-security-policy (per-request nonce and dynamic rendering), https://nextjs.org/docs/app/api-reference/config/next-config-js/output (standalone), https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md (synchronous transactions), https://github.com/panva/jose (RS256 verification).
+
+## Saved profile update
+
+The original one-app/environment limitation is superseded by the user's requirement for named app/platform profiles. SQLite now retains up to 200 profiles and one deployment-wide active selection. Environment variables supply the default plus immutable deployment/auth/key settings. Each operation captures the active profile; pending OIDC transactions store environment and app bindings so activation/editing cannot retarget callbacks. Legacy registration migrates once. See saved-profiles.md for API semantics and upgrade behavior.

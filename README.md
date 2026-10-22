@@ -1,6 +1,6 @@
 # Campus App Inspector
 
-A standalone Next.js console for Campus engineers and QA to inspect actual Campus Apps OIDC launches and OAuth client credentials. Next.js serves the UI and backend; no Go source, process, installation, or backend checkout is needed. Webhook submission is deferred.
+A standalone Next.js console for Campus engineers and QA to inspect actual Campus Apps OIDC launches and OAuth client credentials. Save named app/platform profiles, edit their settings and switch the active profile from **Saved apps**. Next.js serves the UI and backend; no Go source, process, installation, or backend checkout is needed. Webhook submission is deferred.
 
 ## Run locally
 
@@ -29,7 +29,7 @@ docker compose up -d --build
 
 Browser tests start their own production app on 8090 and deterministic Campus fixture on 8091. Stop any server using those ports first. Fixtures use generated keys and test-only identifiers, never staging credentials. Docker verification builds a local image, creates its own temporary named volume/container, verifies persistence, and removes those temporary resources. It does not deploy externally.
 
-## Configure one environment
+## Configure the default environment
 
 | Server-only variable | Purpose |
 | --- | --- |
@@ -48,7 +48,7 @@ Never put secrets in `NEXT_PUBLIC_*`. The UI shows only non-secret environment c
 
 1. Serve the inspector at a public HTTPS origin reachable by Campus, or use an HTTPS development tunnel.
 2. Sign in and open **App setup**. Copy the generated registration JSON to an authorized Campus administrator. They perform `POST /admin/campus-apps` in the appropriate authenticated tenant context. The inspector never asks for or stores that admin bearer token.
-3. Save returned `client_id` and optional `installation_id`. Saving IDs does not register, activate, or verify the app. The registration JSON includes `campus.webhooks.write` and placeholder `qa.inspection.completed`; no event is sent.
+3. Save a named profile with its Campus request base, exact issuer, returned `client_id` and optional `installation_id`. Select **Use profile** to activate it for new inspections. Saving a local profile does not register or verify the app. See [saved apps and platforms](docs/saved-profiles.md). The registration JSON includes `campus.webhooks.write` and placeholder `qa.inspection.completed`; no event is sent.
 4. Obtain a fresh prepared launch reference through the authorized harness described in [the QA runbook](docs/qa.md). Open **Launch inspector** using its original user ID. This is a real browser redirect and cross-site form-post.
 5. Inspect individual checks and technical claims. Signature verification alone does not imply all binding checks passed. Untrusted decoded claims are labeled; identity checks are not run after signature failure.
 6. Run the seven OAuth scenarios. A negative case passes only on the expected rejection. Replay requires a fully verified first bearer token, then reuses the identical assertion. Network, JWKS and fixture prerequisites block the inspection. Rate limits preserve status and numeric rate-limit metadata; requests are never retried.

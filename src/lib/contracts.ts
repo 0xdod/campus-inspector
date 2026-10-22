@@ -4,6 +4,7 @@ export type CheckResult = {
   message: string;
 };
 export type InspectionResult = {
+  profile?: { id: string; name: string; campusBase: string; issuer: string };
   id: string;
   kind: "oidc" | "oauth";
   status: "passed" | "failed" | "blocked";
@@ -25,7 +26,22 @@ export type InspectionResult = {
   verified?: boolean;
 };
 export type Registration = { client_id: string; installation_id?: string };
+export type AppProfile = Registration & {
+  id: string;
+  name: string;
+  campusBase: string;
+  issuer: string;
+  createdAt: string;
+  updatedAt: string;
+};
+export type ProfileInput = Registration & {
+  name: string;
+  campusBase: string;
+  issuer: string;
+};
 export type Bootstrap = {
+  profiles: AppProfile[];
+  activeProfileId: string | null;
   publicUrl: string;
   campusBase: string;
   issuer: string;

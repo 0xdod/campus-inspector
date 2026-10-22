@@ -35,12 +35,16 @@ test("operator setup, real browser form-post, OAuth and redacted export", async 
   });
   expect(missing.status()).toBe(422);
   await page.getByRole("button", { name: "App setup", exact: true }).click();
+  await page.getByLabel("Profile name").fill("Fixture Campus app");
   await page.getByLabel("Client ID", { exact: true }).fill("fixture-client");
   await page.getByLabel("Installation ID").fill("fixture-install");
-  await page.getByRole("button", { name: "Save registration IDs" }).click();
-  await expect(page.getByRole("status")).toContainText(
-    "Registration IDs saved",
-  );
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Use Fixture Campus app", exact: true })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "now active" }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Launch inspector", exact: true })
     .click();
@@ -103,6 +107,7 @@ test("mobile layout, keyboard sign-in, empty/loading states and sign-out", async
   for (const section of [
     "Overview",
     "App setup",
+    "Saved apps",
     "Launch inspector",
     "OAuth playground",
     "Run history",
@@ -151,6 +156,7 @@ test("HTTP transport errors, methods, CSRF and uncached security headers", async
     "n",
     "use",
   ]);
+  expect((await request.get("/api/profiles")).status()).toBe(401);
   const wrongMethod = await request.put("/api/history");
   expect(wrongMethod.status()).toBe(405);
   expect(wrongMethod.headers().allow).toBe("GET");
@@ -178,6 +184,54 @@ test("HTTP transport errors, methods, CSRF and uncached security headers", async
   expect(datatype.status()).toBe(400);
   expect((await datatype.json()).errors[0].field).toBe("client_id");
   expect((await page.request.get("/api/history/absent")).status()).toBe(404);
+  const profileList = await (await page.request.get("/api/profiles")).json();
+  const profile = profileList[0];
+  expect(
+    (await page.request.post("/api/profiles", { data: {} })).status(),
+  ).toBe(403);
+  expect(
+    (
+      await page.request.post("/api/profiles", { headers, data: "{bad" })
+    ).status(),
+  ).toBe(400);
+  const invalidType = await page.request.post("/api/profiles", {
+    headers,
+    data: {
+      name: "Invalid",
+      campusBase: 4,
+      issuer: profile.issuer,
+      client_id: "fixture-client",
+    },
+  });
+  expect(invalidType.status()).toBe(400);
+  expect((await invalidType.json()).errors[0].field).toBe("campusBase");
+  expect(
+    (
+      await page.request.put("/api/profiles/missing", {
+        headers,
+        data: {
+          name: "Absent",
+          campusBase: profile.campusBase,
+          issuer: profile.issuer,
+          client_id: "fixture-client",
+        },
+      })
+    ).status(),
+  ).toBe(404);
+  expect(
+    (
+      await page.request.put("/api/active-profile", {
+        headers,
+        data: { profile_id: "missing" },
+      })
+    ).status(),
+  ).toBe(404);
+  const deniedMethod = await page.request.delete(
+    "/api/profiles/" + profile.id,
+    { headers },
+  );
+  expect(deniedMethod.status()).toBe(405);
+  expect(deniedMethod.headers().allow).toBe("PUT");
   const signout = await page.request.delete("/api/session", { headers });
   expect(signout.status()).toBe(200);
   expect((await page.request.get("/api/history")).status()).toBe(401);
@@ -202,4 +256,72 @@ test("public form-post callback works without operator cookies and never creates
   await page.getByRole("button", { name: "Open inspector" }).click();
   await expect(page.locator(".run-detail .badge")).toHaveText("passed");
   await context.close();
+});
+test("saved apps can be added, edited and switched without losing the original profile", async ({
+  page,
+}) => {
+  await signin(page);
+  await page.getByRole("button", { name: "Saved apps", exact: true }).click();
+  await expect(
+    page.getByRole("article", { name: "Fixture Campus app", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Add profile" }).click();
+  await page.getByLabel("Profile name").fill("Second platform");
+  await page
+    .getByLabel("Campus request base")
+    .fill("https://second-platform.example/api/backend");
+  await page
+    .getByLabel("Expected issuer")
+    .fill("https://second-issuer.example/");
+  await page.getByLabel("Client ID", { exact: true }).fill("second-client");
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await expect(
+    page.getByRole("article", { name: "Second platform", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Edit Second platform", exact: true })
+    .click();
+  await page.getByLabel("Profile name").fill("Renamed platform");
+  await page.getByLabel("Installation ID").fill("second-install");
+  await page
+    .getByRole("button", { name: "Save profile changes", exact: true })
+    .click();
+  await expect(
+    page.getByRole("article", { name: "Renamed platform", exact: true }),
+  ).toContainText("second-install");
+  await expect(
+    page.getByRole("article", { name: "Fixture Campus app", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Use Renamed platform", exact: true })
+    .click();
+  await expect(page.locator(".environment")).toContainText(
+    "second-platform.example/api/backend",
+  );
+  await page.reload();
+  await page.getByRole("button", { name: "Saved apps", exact: true }).click();
+  await expect(
+    page.getByRole("article", { name: "Renamed platform", exact: true }),
+  ).toContainText("Active");
+  await page
+    .getByRole("button", { name: "Use Fixture Campus app", exact: true })
+    .click();
+  await expect(page.locator(".environment")).toContainText(
+    "127.0.0.1:8091/api/backend",
+  );
+  await page.setViewportSize({ width: 320, height: 850 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/saved-profiles-mobile.png",
+    fullPage: true,
+  });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({
+    path: "test-results/saved-profiles-desktop.png",
+    fullPage: true,
+  });
 });

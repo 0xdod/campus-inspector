@@ -1,7 +1,11 @@
 import "server-only";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
+// Startup instrumentation and route handlers can load separate module copies.
+// A shared symbol preserves our error contract across those server bundles.
+const appErrorBrand = Symbol.for("campus.inspector.app-error");
 export class AppError extends Error {
+  readonly [appErrorBrand] = true;
   constructor(
     readonly code: number,
     readonly field: string,
@@ -9,6 +13,16 @@ export class AppError extends Error {
   ) {
     super(safeMessage);
   }
+}
+function isAppError(error: unknown): error is AppError {
+  if (typeof error !== "object" || error === null) return false;
+  const candidate = error as Partial<AppError>;
+  return (
+    candidate[appErrorBrand] === true &&
+    typeof candidate.code === "number" &&
+    typeof candidate.field === "string" &&
+    typeof candidate.safeMessage === "string"
+  );
 }
 export function fail(code: number, field: string, message: string): never {
   throw new AppError(code, field, message);
@@ -46,7 +60,7 @@ export async function handle(fn: () => Promise<Response> | Response) {
         400,
       );
     }
-    if (e instanceof AppError)
+    if (isAppError(e))
       return json(
         {
           status: statuses[e.code],

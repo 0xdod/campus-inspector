@@ -1,4 +1,5 @@
 "use client";
+import { SavedProfiles } from "./SavedProfiles";
 import { useState } from "react";
 import type { Bootstrap } from "@/lib/contracts";
 import type { RequestFn } from "./Console";
@@ -11,8 +12,7 @@ export function Setup({
   request: RequestFn;
   onSave: () => Promise<void>;
 }) {
-  const [message, setMessage] = useState(""),
-    [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
   return (
     <div className="two-column">
       <section className="panel">
@@ -67,76 +67,26 @@ export function Setup({
         >
           Copy registration JSON
         </button>
+        <p role="status" className="caption">
+          {message}
+        </p>
         <p className="caption">
           Do not enter Campus admin bearer tokens here. No webhook event is
           sent.
         </p>
       </section>
-      <section className="panel">
-        <span className="eyebrow">02 / SAVE RETURNED IDS</span>
-        <h2>Connect your registration</h2>
-        <p>
-          After the authorized admin step, save the returned IDs. Saving IDs
-          does not register or verify the app.
-        </p>
-        <form
-          key={boot.registration.client_id}
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setBusy(true);
-            setMessage("");
-            const form = new FormData(e.currentTarget);
-            try {
-              await request("registration", "PUT", {
-                client_id: form.get("client_id"),
-                ...(form.get("installation_id")
-                  ? { installation_id: form.get("installation_id") }
-                  : {}),
-              });
-              await onSave();
-              setMessage(
-                "Registration IDs saved. Run a real inspection to verify them.",
-              );
-            } catch (e) {
-              setMessage(e instanceof Error ? e.message : "Save failed");
-            } finally {
-              setBusy(false);
-            }
-          }}
-        >
-          <label htmlFor="client-id">Client ID</label>
-          <input
-            id="client-id"
-            name="client_id"
-            defaultValue={boot.registration.client_id}
-            required
-            maxLength={256}
-          />
-          <label htmlFor="installation-id">
-            Installation ID <span className="muted">(optional)</span>
-          </label>
-          <input
-            id="installation-id"
-            name="installation_id"
-            defaultValue={boot.registration.installation_id}
-            maxLength={256}
-          />
-          <button disabled={busy}>
-            {busy ? "Saving…" : "Save registration IDs"}
-          </button>
-        </form>
-        <div role="status" className="caption">
-          {message}
-        </div>
-        <hr />
-        <h3>Platform key observations</h3>
-        <p>{boot.jwksObservation.status}</p>
-        <p className="caption">
-          {boot.jwksObservation.observedAt ||
-            "Keys are fetched during token verification."}{" "}
-          This does not prove Campus’s five-minute key cache.
-        </p>
-      </section>
+      <div>
+        <SavedProfiles boot={boot} request={request} onSave={onSave} />
+        <section className="panel">
+          <h3>Platform key observations</h3>
+          <p>{boot.jwksObservation.status}</p>
+          <p className="caption">
+            {boot.jwksObservation.observedAt ||
+              "Keys are fetched during token verification."}{" "}
+            This does not prove Campus’s five-minute key cache.
+          </p>
+        </section>
+      </div>
     </div>
   );
 }

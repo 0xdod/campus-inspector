@@ -89,3 +89,19 @@ it("returns 400 for a nonnumeric original user ID instead of a runtime conversio
   expect(response.status).toBe(400);
   expect((await response.json()).errors[0].field).toBe("login_hint");
 });
+it("preserves API errors originating from a separate server bundle", async () => {
+  const { AppError } = await import("@/server/http");
+  vi.resetModules();
+  const { AppError: OtherBundleError } = await import("@/server/http");
+  const error = new OtherBundleError(
+    404,
+    "profile_id",
+    "Saved profile not found",
+  );
+  expect(error).not.toBeInstanceOf(AppError);
+  const response = await handle(() => {
+    throw error;
+  });
+  expect(response.status).toBe(404);
+  expect((await response.json()).errors[0].field).toBe("profile_id");
+});

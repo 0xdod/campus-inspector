@@ -352,3 +352,102 @@ it("never reports a persisted success after SQLite rejects evidence", async () =
     s.db.exec("DROP TRIGGER fail_run");
   }
 });
+it("keeps a launch bound to its original platform and app after switching profiles", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "profile-launch-"));
+  const local = new Store(dir);
+  try {
+    const { saveProfile, profileConfig } =
+      await import("@/server/profiles/service");
+    const original = saveProfile(c, local, {
+      name: "Original platform",
+      campusBase: c.campusBase,
+      issuer: c.issuer,
+      client_id: "fixture-client",
+      installation_id: "fixture-install",
+    });
+    const second = saveProfile(c, local, {
+      name: "Other platform",
+      campusBase: "http://127.0.0.1:1",
+      issuer: "https://other.example/",
+      client_id: "other-client",
+    });
+    const captured = profileConfig(c, original);
+    local.activateProfile(second.id);
+    const u = new URL(
+      startLaunch(captured, local, { login_hint: "7", reference: "opaque" }),
+    );
+    expect(u.searchParams.get("client_id")).toBe("fixture-client");
+    saveProfile(
+      c,
+      local,
+      {
+        name: "Changed old profile",
+        campusBase: "http://127.0.0.1:1",
+        issuer: "https://edited.example/",
+        client_id: "edited-client",
+      },
+      original.id,
+    );
+    const run = await callback(
+      profileConfig(c, second),
+      local,
+      u.searchParams.get("state")!,
+      await fixture.sign(fixture.identity(u.searchParams.get("nonce")!)),
+    );
+    expect(run.status).toBe("passed");
+    expect(run.profile).toMatchObject({
+      id: original.id,
+      name: "Original platform",
+      issuer: c.issuer,
+    });
+  } finally {
+    local.close();
+    rmSync(dir, { force: true, recursive: true });
+  }
+});
+it("uses the captured OAuth profile even when the active selection has changed", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "profile-oauth-"));
+  const local = new Store(dir);
+  try {
+    const { saveProfile, profileConfig } =
+      await import("@/server/profiles/service");
+    const original = saveProfile(c, local, {
+      name: "OAuth profile",
+      campusBase: c.campusBase,
+      issuer: c.issuer,
+      client_id: "fixture-client",
+      installation_id: "fixture-install",
+    });
+    const second = saveProfile(c, local, {
+      name: "Other",
+      campusBase: "http://127.0.0.1:1",
+      issuer: "https://other.example/",
+      client_id: "other-client",
+    });
+    local.activateProfile(second.id);
+    const run = await runOAuth(profileConfig(c, original), local, keys, {
+      scenario: "valid",
+      scope: "campus.webhooks.write",
+    });
+    expect(run.status).toBe("passed");
+    expect(run.profile?.id).toBe(original.id);
+    const { exportEvidence } = await import("@/server/evidence/redaction");
+    expect(exportEvidence([run])[0]).not.toHaveProperty("profile");
+  } finally {
+    local.close();
+    rmSync(dir, { force: true, recursive: true });
+  }
+});
+it("consumes and rejects pre-upgrade pending state without guessing a platform", async () => {
+  s.addLaunch("legacy-profile-state", {
+    created: Date.now(),
+    expires: Date.now() + 300000,
+    user: "7",
+    client: "fixture-client",
+    nonce: "hidden",
+  });
+  await expect(
+    callback(c, s, "legacy-profile-state", "invalid"),
+  ).rejects.toThrow("start a fresh launch");
+  expect(s.consumeLaunch("legacy-profile-state")).toBeUndefined();
+});

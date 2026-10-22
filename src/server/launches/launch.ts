@@ -6,6 +6,7 @@ import { secret, type Store } from "@/server/db/store";
 import { fail } from "@/server/http";
 import { verifyToken } from "@/server/crypto/verify";
 import { UpstreamError } from "@/server/campus/client";
+import type { ProfileConfig } from "@/server/profiles/service";
 import type { InspectionResult } from "@/lib/contracts";
 const boundedText = z
   .string()
@@ -30,11 +31,11 @@ export const launchSchema = z
   })
   .strict();
 export function startLaunch(
-  c: Config,
+  c: ProfileConfig,
   s: Store,
   input: z.infer<typeof launchSchema>,
 ) {
-  const r = s.registration();
+  const r = c.profile || s.registration();
   if (!r.client_id)
     fail(422, "client_id", "Save the registered Campus client ID first");
   const parsed = launchSchema.parse(input);
@@ -43,6 +44,18 @@ export function startLaunch(
   const now = Date.now();
   s.addLaunch(state, {
     created: now,
+    campusBase: c.campusBase,
+    issuer: c.issuer,
+    ...(c.profile
+      ? {
+          profile: {
+            id: c.profile.id,
+            name: c.profile.name,
+            campusBase: c.campusBase,
+            issuer: c.issuer,
+          },
+        }
+      : {}),
     user: parsed.login_hint,
     client: r.client_id,
     installation: r.installation_id,
@@ -65,10 +78,14 @@ export function startLaunch(
   }).toString();
   return url.toString();
 }
-export function publicInitiation(c: Config, s: Store, p: URLSearchParams) {
+export function publicInitiation(
+  c: ProfileConfig,
+  s: Store,
+  p: URLSearchParams,
+) {
   if (p.get("iss") !== c.issuer)
     fail(400, "iss", "iss must exactly match the configured Campus issuer");
-  const r = s.registration();
+  const r = c.profile || s.registration();
   if (!r.client_id)
     fail(422, "client_id", "Save the registered Campus client ID first");
   if (p.has("client_id") && p.get("client_id") !== r.client_id)
@@ -105,9 +122,16 @@ export async function callback(
   const snapshot = s.consumeLaunch(state);
   if (!snapshot)
     fail(400, "state", "State is unknown, expired or already used");
+  if (!snapshot.campusBase || !snapshot.issuer)
+    fail(
+      400,
+      "state",
+      "This launch predates saved profiles; start a fresh launch",
+    );
   const run: InspectionResult = {
     id: randomUUID(),
     kind: "oidc",
+    profile: snapshot.profile,
     status: "failed",
     createdAt: new Date().toISOString(),
     checks: [
@@ -126,7 +150,15 @@ export async function callback(
     },
   };
   try {
-    const result = await verifyToken(c, token, { kind: "oidc", ...snapshot });
+    const result = await verifyToken(
+      {
+        ...c,
+        campusBase: snapshot.campusBase,
+        issuer: snapshot.issuer,
+      },
+      token,
+      { kind: "oidc", ...snapshot },
+    );
     run.checks.push(...result.checks);
     run.header = result.header;
     run.claims = result.claims;
