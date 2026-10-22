@@ -8,3 +8,10 @@ data
 *.sqlite*
 test-results
 playwright-report
+coverage
+*.tsbuildinfo
+.github
+docs
+deploy
+README.md
+compose*.yaml

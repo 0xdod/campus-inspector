@@ -37,22 +37,25 @@ If your VPS already runs Nginx, Caddy, or another proxy on ports 80/443, use onl
 
 ## Build and publish images with GitHub Actions
 
-The [CI workflow](../.github/workflows/ci.yaml) runs the existing typecheck, lint, tests, production build, browser tests and Docker smoke test, plus a production dependency audit. A successful run publishes to `ghcr.io/0xdod/campus-inspector` on pushes to the repository's default branch, pushes to `dev`, and tags beginning with `v`. You can also use **Actions → Verify and publish inspector → Run workflow** once the workflow is available on the default branch. Pull requests run verification without publishing.
+The [CI workflow](../.github/workflows/ci.yaml) runs on pushes to `dev`. Its first job installs dependencies, audits production dependencies, runs lint, and runs unit/integration tests. Its second job builds the production Docker image once, smoke-tests that exact image, then tags and pushes it to `ghcr.io/0xdod/campus-inspector`. The Next.js build inside Docker performs TypeScript checking; CI does not repeat a standalone Next.js build or typecheck. BuildKit layers are cached between runs, and documentation, deployment examples, CI files and local TypeScript caches are excluded from the Docker context so they do not invalidate app build layers.
 
-The workflow builds both `linux/amd64` and `linux/arm64`, using the existing Dockerfile. It authenticates with GitHub's built-in `GITHUB_TOKEN` and grants `packages: write` only to the publishing job. No registry password or app deployment secrets are required in Actions. Image names follow the repository name automatically and are lowercased; if you fork or rename the repository, update the deployment image reference accordingly.
+The workflow builds native `linux/amd64` for the Dokploy VPS. It does not install QEMU or build ARM64 images. It authenticates with GitHub's built-in `GITHUB_TOKEN` and grants `packages: write` only to the publishing job, after the fast checks pass. Registry login happens after the container smoke test. No registry password or app deployment secrets are required in Actions. Image names follow the repository name automatically and are lowercased; if you fork or rename the repository, update the deployment image reference accordingly.
 
 | Tag | Published from |
 | --- | --- |
 | `dev` | The `dev` branch |
-| `latest` | The repository's default branch only |
-| `v1.2.3` | A Git tag named `v1.2.3` |
+| `latest` | Only when `dev` is also the repository's default branch |
 | `sha-<full-commit-sha>` | Each published commit |
 
-Branch tags have `/` replaced with `-` when necessary. The Actions run summary also provides the exact image digest for reproducible deployments and rollbacks. A successful build for both architectures does not imply both architectures have had native runtime testing; the Docker smoke test runs on the GitHub runner's architecture.
+The Actions run summary also provides the exact image digest for reproducible deployments and rollbacks. Tag pushes, other branches and pull requests do not trigger this workflow. If you change its triggers later, review image-tag rules at the same time.
+
+Browser regression tests are available in the separate [Browser regression checks workflow](../.github/workflows/browser.yaml), triggered manually from Actions once that workflow is available on the repository's default branch. Select the branch you want to test. It builds standalone output, installs Chromium and runs the browser suite, retaining traces/screenshots on failure. Run it for UI or browser-authentication changes; it is not a publication gate on every push.
+
+Locally, `npm run test:docker` still builds and tests an image. To smoke-test one you already built, set `INSPECTOR_TEST_IMAGE=campus-inspector:ci` before that command. This performs the same non-root/read-only, authentication and restart-persistence checks without another Docker build. The smoke test creates and cleans up its own container and volume.
 
 ### Pull the image with Compose
 
-Use [compose.ghcr.yaml](../compose.ghcr.yaml) **instead of** `compose.yaml`; it contains no build instruction. Prepare `.env` as above, optionally set `IMAGE_TAG=dev`, `IMAGE_TAG=latest`, or a published version/commit tag, then run:
+Use [compose.ghcr.yaml](../compose.ghcr.yaml) **instead of** `compose.yaml`; it contains no build instruction. Prepare `.env` as above, optionally set `IMAGE_TAG=dev`, `IMAGE_TAG=latest` (if published), or a published commit tag, then run:
 
 ```sh
 docker compose -f compose.ghcr.yaml up -d

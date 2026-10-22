@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 const suffix = process.pid + "-" + randomBytes(3).toString("hex");
 const name = "campus-inspector-smoke-" + suffix,
   volume = name + "-data",
-  image = "campus-inspector:smoke";
+  image = process.env.INSPECTOR_TEST_IMAGE || "campus-inspector:smoke";
 const docker = (...args) =>
   execFileSync("docker", args, {
     encoding: "utf8",
@@ -30,8 +30,12 @@ async function api(path, method = "GET", body, headers = {}) {
   return { response, body: await response.json() };
 }
 try {
-  console.log("Building production image");
-  execFileSync("docker", ["build", "-t", image, "."], { stdio: "inherit" });
+  if (process.env.INSPECTOR_TEST_IMAGE) {
+    console.log("Testing existing image: " + image);
+  } else {
+    console.log("Building production image");
+    execFileSync("docker", ["build", "-t", image, "."], { stdio: "inherit" });
+  }
   docker("volume", "create", volume);
   docker(
     "run",
