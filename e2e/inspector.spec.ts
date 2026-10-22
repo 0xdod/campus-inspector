@@ -14,7 +14,7 @@ test("operator setup, real browser form-post, OAuth and redacted export", async 
   const errors: string[] = [];
   const apiResponses: Promise<string>[] = [];
   page.on("response", (res) => {
-    if (/\/api\/(history|oauth|bootstrap)/.test(res.url()))
+    if (/\/api\/(history|oauth|bootstrap|logs)/.test(res.url()))
       apiResponses.push(res.text());
   });
   page.on("pageerror", (e) => errors.push(e.message));
@@ -62,7 +62,9 @@ test("operator setup, real browser form-post, OAuth and redacted export", async 
   await expect(
     page.getByText("Signature verified using configured Campus JWKS"),
   ).toBeVisible();
-  await expect(page.locator(".run-detail .badge")).toHaveText("passed");
+  await expect(
+    page.getByRole("status", { name: "Inspection result" }),
+  ).toHaveText("passed");
   await page
     .getByRole("button", { name: "OAuth playground", exact: true })
     .click();
@@ -71,7 +73,41 @@ test("operator setup, real browser form-post, OAuth and redacted export", async 
   await expect(
     page.getByText("The unchanged assertion must be rejected"),
   ).toBeVisible();
-  await expect(page.locator(".run-detail .badge")).toHaveText("passed");
+  await expect(
+    page.getByRole("status", { name: "Inspection result" }),
+  ).toHaveText("passed");
+  const logList = await (await page.request.get("/api/logs")).json();
+  const callbackLog = logList.find(
+    (log: { kind: string; direction: string }) =>
+      log.kind === "oidc" && log.direction === "inbound",
+  );
+  expect(callbackLog.status).toBe(303);
+  const callbackDetail = await (
+    await page.request.get("/api/logs/" + callbackLog.id)
+  ).json();
+  expect(callbackDetail.request.body).toMatchObject({
+    state: "[REDACTED]",
+    id_token: "[REDACTED]",
+  });
+  await page.getByRole("button", { name: "Request logs", exact: true }).click();
+  await page.getByLabel("Traffic type").selectOption("oauth");
+  await page
+    .locator(".http-log-list button")
+    .filter({ hasText: "200" })
+    .first()
+    .click();
+  const detail = page.locator(".http-log-detail");
+  await expect(
+    detail.getByRole("heading", { name: "Request body", exact: true }),
+  ).toBeVisible();
+  await expect(detail.locator("pre").first()).toContainText(
+    '"grant_type": "client_credentials"',
+  );
+  await expect(detail).toContainText('"access_token": "[REDACTED]"');
+  await page.screenshot({
+    path: "test-results/http-logs-desktop.png",
+    fullPage: true,
+  });
   const evidence = await page.request.get("/api/evidence");
   expect(evidence.status()).toBe(200);
   const text = await evidence.text();
@@ -111,6 +147,7 @@ test("mobile layout, keyboard sign-in, empty/loading states and sign-out", async
     "Launch inspector",
     "OAuth playground",
     "Run history",
+    "Request logs",
   ]) {
     await page.getByRole("button", { name: section, exact: true }).click();
     expect(
@@ -157,6 +194,7 @@ test("HTTP transport errors, methods, CSRF and uncached security headers", async
     "use",
   ]);
   expect((await request.get("/api/profiles")).status()).toBe(401);
+  expect((await request.get("/api/logs")).status()).toBe(401);
   const wrongMethod = await request.put("/api/history");
   expect(wrongMethod.status()).toBe(405);
   expect(wrongMethod.headers().allow).toBe("GET");
@@ -232,6 +270,28 @@ test("HTTP transport errors, methods, CSRF and uncached security headers", async
   );
   expect(deniedMethod.status()).toBe(405);
   expect(deniedMethod.headers().allow).toBe("PUT");
+  expect((await page.request.get("/api/logs/absent")).status()).toBe(404);
+  expect((await page.request.get("/api/logs/invalid.id")).status()).toBe(400);
+  const logMethod = await page.request.post("/api/logs", { headers });
+  expect(logMethod.status()).toBe(405);
+  expect(logMethod.headers().allow).toBe("GET");
+  const rejected = await page.request.post("/oidc/callback", {
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      cookie: "ignored=SENTINEL-COOKIE",
+    },
+    data: "state=SENTINEL-STATE&id_token=SENTINEL-ID-TOKEN",
+  });
+  expect(rejected.status()).toBe(400);
+  const logs = await (await page.request.get("/api/logs")).json();
+  const rejectedLog = logs.find(
+    (log: { direction: string; status: number }) =>
+      log.direction === "inbound" && log.status === 400,
+  );
+  expect(rejectedLog).toBeTruthy();
+  const rejectedDetail = await page.request.get("/api/logs/" + rejectedLog.id);
+  expect(rejectedDetail.headers()["cache-control"]).toContain("no-store");
+  expect(await rejectedDetail.text()).not.toContain("SENTINEL");
   const signout = await page.request.delete("/api/session", { headers });
   expect(signout.status()).toBe(200);
   expect((await page.request.get("/api/history")).status()).toBe(401);
@@ -254,7 +314,9 @@ test("public form-post callback works without operator cookies and never creates
   expect((await page.request.get("/api/history")).status()).toBe(401);
   await page.getByLabel("Operator password").fill("fixture-only-long-password");
   await page.getByRole("button", { name: "Open inspector" }).click();
-  await expect(page.locator(".run-detail .badge")).toHaveText("passed");
+  await expect(
+    page.getByRole("status", { name: "Inspection result" }),
+  ).toHaveText("passed");
   await context.close();
 });
 test("saved apps can be added, edited and switched without losing the original profile", async ({

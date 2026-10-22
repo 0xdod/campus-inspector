@@ -35,6 +35,7 @@ const methods: Record<string, string[]> = {
   profiles: ["GET", "POST"],
   "active-profile": ["PUT"],
   history: ["GET"],
+  logs: ["GET"],
   evidence: ["GET"],
   launch: ["POST"],
   oauth: ["POST"],
@@ -43,8 +44,15 @@ export function api(req: Request) {
   return handle(async () => {
     const path = new URL(req.url).pathname.slice("/api/".length);
     const isDetail = path.startsWith("history/");
+    const logMatch = /^logs\/([^/]+)$/.exec(path);
     const profileMatch = /^profiles\/([^/]+)$/.exec(path);
-    const allowed = profileMatch ? ["PUT"] : isDetail ? ["GET"] : methods[path];
+    const allowed = logMatch
+      ? ["GET"]
+      : profileMatch
+        ? ["PUT"]
+        : isDetail
+          ? ["GET"]
+          : methods[path];
     if (!allowed) fail(404, "path", "Resource not found");
     if (!allowed.includes(req.method))
       return json(
@@ -122,6 +130,30 @@ export function api(req: Request) {
         .parse(await bodyJSON(req));
       saveRegistrationProfile(c, s, body);
       return json(s.registration());
+    }
+    if (path === "logs") {
+      const runId = new URL(req.url).searchParams.get("run_id");
+      if (runId && !/^[A-Za-z0-9-]{1,64}$/.test(runId))
+        fail(400, "run_id", "run_id must be a valid inspection identifier");
+      return json(
+        s
+          .httpLogs()
+          .filter((log) => !runId || log.runId === runId)
+          .map(({ request, response, ...summary }) => ({
+            ...summary,
+            method: request.method,
+            url: request.url,
+            status: response?.status,
+          })),
+      );
+    }
+    if (logMatch) {
+      const id = logMatch[1];
+      if (!/^[A-Za-z0-9-]{1,64}$/.test(id))
+        fail(400, "id", "id must be a valid log identifier");
+      const log = s.httpLog(id);
+      if (!log) fail(404, "id", "Request log not found");
+      return json(log);
     }
     if (path === "history")
       return json(

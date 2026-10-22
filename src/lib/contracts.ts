@@ -60,3 +60,30 @@ export const scenarios = [
   "jti_replay",
 ] as const;
 export type Scenario = (typeof scenarios)[number];
+export type HttpLog = {
+  id: string;
+  createdAt: string;
+  kind: "oidc" | "oauth" | "jwks";
+  direction: "server" | "inbound" | "browser_redirect";
+  outcome: "completed" | "unavailable" | "unobserved";
+  durationMs?: number;
+  runId?: string;
+  profile?: InspectionResult["profile"];
+  note?: string;
+  request: {
+    method: string;
+    url: string;
+    headers: Record<string, string>;
+    body: Record<string, unknown> | string | null;
+  };
+  response?: {
+    status: number;
+    headers: Record<string, string>;
+    body: Record<string, unknown> | string | null;
+  };
+};
+export type HttpLogSummary = Omit<HttpLog, "request" | "response"> & {
+  method: string;
+  url: string;
+  status?: number;
+};

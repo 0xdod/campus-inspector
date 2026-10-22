@@ -2,7 +2,11 @@ import "server-only";
 import { SignJWT, generateKeyPair } from "jose";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { scenarios, type InspectionResult } from "@/lib/contracts";
+import {
+  scenarios,
+  type InspectionResult,
+  type HttpLog,
+} from "@/lib/contracts";
 import { audience } from "@/server/config";
 import type { ProfileConfig } from "@/server/profiles/service";
 import type { Store } from "@/server/db/store";
@@ -10,6 +14,7 @@ import type { loadKeys } from "@/server/crypto/keys";
 import { campusRequest, UpstreamError } from "@/server/campus/client";
 import { fail } from "@/server/http";
 import { oauthError, safeEnvelope } from "@/server/evidence/redaction";
+import { httpRequestBody } from "@/server/logs/redaction";
 import { verifyToken } from "@/server/crypto/verify";
 export const oauthSchema = z
   .object({
@@ -72,6 +77,8 @@ export async function runOAuth(
       client_assertion: "[REDACTED]",
     },
   };
+  const record = (log: HttpLog) =>
+    s.saveHttpLog({ ...log, runId: run.id, profile: run.profile });
   try {
     const now = Math.floor(Date.now() / 1000);
     const key =
@@ -102,8 +109,13 @@ export async function runOAuth(
       form.set("client_assertion", assertion);
     if (scenario !== "missing_scope") form.set("scope", scope);
     if (r.installation_id) form.set("installation_id", r.installation_id);
+    run.request = {
+      method: "POST",
+      path: "/apps/oauth2/token",
+      ...httpRequestBody(form),
+    };
     const exchange = async () => {
-      const res = await campusRequest(c, "/apps/oauth2/token", form);
+      const res = await campusRequest(c, "/apps/oauth2/token", form, record);
       run.exchanges!.push({
         status: res.status,
         error: oauthError(res.body),
@@ -145,12 +157,17 @@ export async function runOAuth(
       });
       let valid = false;
       if (envelope) {
-        const verified = await verifyToken(c, body.access_token as string, {
-          kind: "oauth",
-          client: r.client_id,
-          installation: r.installation_id,
-          scope: granted,
-        });
+        const verified = await verifyToken(
+          c,
+          body.access_token as string,
+          {
+            kind: "oauth",
+            client: r.client_id,
+            installation: r.installation_id,
+            scope: granted,
+          },
+          record,
+        );
         run.checks.push(...verified.checks);
         run.claims = verified.claims;
         run.header = verified.header;

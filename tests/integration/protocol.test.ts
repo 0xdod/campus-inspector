@@ -451,3 +451,96 @@ it("consumes and rejects pre-upgrade pending state without guessing a platform",
   ).rejects.toThrow("start a fresh launch");
   expect(s.consumeLaunch("legacy-profile-state")).toBeUndefined();
 });
+it("records request/response bodies, status, timing and JWKS for a verified OAuth run", async () => {
+  const run = await runOAuth(c, s, keys, {
+    scenario: "valid",
+    scope: "campus.webhooks.write",
+  });
+  const logs = s.httpLogs().filter((log) => log.runId === run.id);
+  expect(logs).toHaveLength(2);
+  const token = logs.find((log) => log.kind === "oauth")!;
+  expect(token.request.body).toMatchObject({
+    grant_type: "client_credentials",
+    client_assertion_type:
+      "urn:ietf:params:oauth:client-assertion-type:jwt-bearer",
+    scope: "campus.webhooks.write",
+    client_assertion: "[REDACTED]",
+  });
+  expect(token.response).toMatchObject({
+    status: 200,
+    body: {
+      token_type: "Bearer",
+      access_token: "[REDACTED]",
+      expires_in: 3600,
+    },
+  });
+  expect(token.durationMs).toBeGreaterThanOrEqual(0);
+  expect(logs.find((log) => log.kind === "jwks")?.request.method).toBe("GET");
+  expect(JSON.stringify(logs)).not.toContain(
+    fixture.requests()[0].get("client_assertion")!,
+  );
+  expect(JSON.stringify(logs)).not.toContain("SENTINEL");
+});
+it("shows fields actually sent by negative scenarios instead of their default inputs", async () => {
+  const run = await runOAuth(c, s, keys, {
+    scenario: "missing_scope",
+    scope: "campus.webhooks.write",
+  });
+  const log = s.httpLogs().find((log) => log.runId === run.id)!;
+  expect(log.request.body).not.toHaveProperty("scope");
+  expect(log.response).toMatchObject({
+    status: 400,
+    body: { error: "invalid_scope", error_description: "[REDACTED]" },
+  });
+});
+it("records separate replay exchanges without raw assertions or tokens", async () => {
+  const run = await runOAuth(c, s, keys, {
+    scenario: "jti_replay",
+    scope: "campus.webhooks.write",
+  });
+  const logs = s.httpLogs().filter((log) => log.runId === run.id);
+  expect(logs).toHaveLength(3);
+  expect(
+    logs
+      .filter((log) => log.kind === "oauth")
+      .map((log) => log.response?.status)
+      .sort(),
+  ).toEqual([200, 401]);
+  expect(JSON.stringify(logs)).not.toContain("SENTINEL");
+});
+it("retains a prepared redirect even when Campus never calls back, without inventing a response", () => {
+  const u = new URL(
+    startLaunch(c, s, {
+      login_hint: "7",
+      reference: "SENTINEL-UNOBSERVED-REFERENCE",
+      nonce: "SENTINEL-UNOBSERVED-NONCE",
+    }),
+  );
+  const log = s
+    .httpLogs()
+    .find((log) => log.direction === "browser_redirect" && !log.runId)!;
+  expect(log.outcome).toBe("unobserved");
+  expect(log.response).toBeUndefined();
+  expect(log.request.url).not.toContain(u.searchParams.get("state")!);
+  expect(log.request.url).not.toContain("SENTINEL");
+});
+it("logs network failure without a fabricated HTTP status and does not retry", async () => {
+  const run = await runOAuth(
+    { ...c, campusBase: "http://127.0.0.1:1" },
+    s,
+    keys,
+    { scenario: "valid", scope: "campus.webhooks.write" },
+  );
+  expect(run.status).toBe("blocked");
+  const logs = s.httpLogs().filter((log) => log.runId === run.id);
+  expect(logs).toHaveLength(1);
+  expect(logs[0].outcome).toBe("unavailable");
+  expect(logs[0].response).toBeUndefined();
+});
+it("propagates log persistence failures instead of misclassifying them as a Campus JWKS failure", async () => {
+  await expect(
+    platformKeys(c, () => {
+      throw new Error("log persistence failed");
+    }),
+  ).rejects.toThrow("log persistence failed");
+});

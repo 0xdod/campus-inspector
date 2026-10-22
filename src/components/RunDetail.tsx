@@ -1,3 +1,4 @@
+import { RequestLogs } from "./RequestLogs";
 import type { InspectionResult } from "@/lib/contracts";
 export function RunDetail({
   run,
@@ -23,7 +24,13 @@ export function RunDetail({
             {run.durationMs !== undefined && ` · ${run.durationMs}ms`}
           </p>
         </div>
-        <span className={"badge " + run.status}>{run.status}</span>
+        <span
+          role="status"
+          aria-label="Inspection result"
+          className={"badge " + run.status}
+        >
+          {run.status}
+        </span>
       </div>
       {run.profile && (
         <p className="caption">
@@ -55,6 +62,7 @@ export function RunDetail({
           </li>
         ))}
       </ol>
+      <RequestLogs runId={run.id} />
       {run.exchanges?.map((exchange, i) => (
         <details key={i} open>
           <summary>

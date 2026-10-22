@@ -13,3 +13,7 @@ Sources: https://nextjs.org/docs/app/api-reference/file-conventions/route (Node 
 ## Saved profile update
 
 The original one-app/environment limitation is superseded by the user's requirement for named app/platform profiles. SQLite now retains up to 200 profiles and one deployment-wide active selection. Environment variables supply the default plus immutable deployment/auth/key settings. Each operation captures the active profile; pending OIDC transactions store environment and app bindings so activation/editing cannot retarget callbacks. Legacy registration migrates once. See saved-profiles.md for API semantics and upgrade behavior.
+
+## Integration traffic logging
+
+A separate bounded http_logs table records redacted integration traffic, including prepared redirects that never return a callback. HTTP transport accepts a recorder so OAuth/JWKS observations remain correlated to the run/profile captured for that operation. Bodies are allowlisted/redacted before persistence. Callback/initiation wrappers record inbound form shape and the inspector response; redirects do not claim to observe Campus's browser response. Historical evidence export remains independent of detailed log bodies. Migration 003 is additive.

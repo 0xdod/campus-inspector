@@ -1,4 +1,12 @@
 import "server-only";
+import type { HttpLog } from "@/lib/contracts";
+import {
+  newHttpLog,
+  httpRequestBody,
+  httpResponseBody,
+  redactedURL,
+  safeContentType,
+} from "@/server/logs/redaction";
 import { lookup } from "node:dns/promises";
 import { request as httpsRequest } from "node:https";
 import { request as httpRequest } from "node:http";
@@ -48,7 +56,7 @@ export class UpstreamError extends Error {
     super("Campus transport or JWKS prerequisite unavailable");
   }
 }
-export async function campusRequest(
+async function performCampusRequest(
   c: Config,
   path: string,
   body?: URLSearchParams,
@@ -56,6 +64,7 @@ export async function campusRequest(
   status: number;
   body: unknown;
   rateLimit: Record<string, string>;
+  headers: Record<string, string>;
 }> {
   const u = new URL(campusURL(c, path));
   const hostname = u.hostname.replace(/^\[|\]$/g, "");
@@ -134,7 +143,15 @@ export async function campusRequest(
               if (typeof value === "string" && /^\d{1,12}$/.test(value))
                 rateLimit[name] = value;
             }
-            resolve({ status: res.statusCode || 502, body: data, rateLimit });
+            resolve({
+              status: res.statusCode || 502,
+              body: data,
+              rateLimit,
+              headers: {
+                "content-type": safeContentType(res.headers["content-type"]),
+                ...rateLimit,
+              },
+            });
           });
         },
       );
@@ -149,4 +166,48 @@ export async function campusRequest(
   } catch {
     throw new UpstreamError();
   }
+}
+
+export type HttpLogRecorder = (log: HttpLog) => void;
+export async function campusRequest(
+  c: Config,
+  path: string,
+  body?: URLSearchParams,
+  record?: HttpLogRecorder,
+) {
+  const started = Date.now();
+  const kind = path === "/.well-known/jwks.json" ? "jwks" : "oauth";
+  const log = newHttpLog(kind, "server", {
+    method: body ? "POST" : "GET",
+    url: redactedURL(campusURL(c, path)),
+    headers: {
+      accept: "application/json",
+      ...(body ? { "content-type": "application/x-www-form-urlencoded" } : {}),
+    },
+    body: body ? httpRequestBody(body) : null,
+  });
+  let result: Awaited<ReturnType<typeof performCampusRequest>>;
+  try {
+    result = await performCampusRequest(c, path, body);
+  } catch (error) {
+    record?.({
+      ...log,
+      outcome: "unavailable",
+      durationMs: Date.now() - started,
+      note: "No complete response received: network, timeout, response limit or destination checks prevented completion.",
+    });
+    throw error;
+  }
+  record?.({
+    ...log,
+    outcome: "completed",
+    durationMs: Date.now() - started,
+    response: {
+      status: result.status,
+      headers: result.headers,
+      body: httpResponseBody(result.body, kind),
+    },
+    note: "Credential values and unrecognized upstream fields are redacted.",
+  });
+  return result;
 }

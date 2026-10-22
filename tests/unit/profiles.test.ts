@@ -118,7 +118,7 @@ it("upgrades a database with only the original schema without losing history or 
     checks: [],
   });
   s.db.exec(
-    "DROP TABLE active_profile; DROP TABLE app_profiles; DELETE FROM schema_migrations WHERE version=2",
+    "DROP TABLE active_profile; DROP TABLE app_profiles; DROP TABLE http_logs; DELETE FROM schema_migrations WHERE version>1",
   );
   s.close();
   s = new Store(dir);
@@ -129,7 +129,7 @@ it("upgrades a database with only the original schema without losing history or 
     s.db
       .prepare("SELECT version FROM schema_migrations ORDER BY version")
       .all(),
-  ).toEqual([{ version: 1 }, { version: 2 }]);
+  ).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
 });
 it("bounds saved profiles without deleting old entries and still permits edits at capacity", () => {
   for (let i = 0; i < 200; i++)

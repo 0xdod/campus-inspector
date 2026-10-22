@@ -3,12 +3,14 @@ import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Bootstrap, InspectionResult } from "@/lib/contracts";
+import { RequestLogs } from "./RequestLogs";
 import { SavedProfiles } from "./SavedProfiles";
 import { Setup } from "./Setup";
 import { Playgrounds } from "./Playgrounds";
 import { History } from "./History";
 import { Overview } from "./Overview";
-type Tab = "overview" | "setup" | "profiles" | "launch" | "oauth" | "history";
+type Tab =
+  "overview" | "setup" | "profiles" | "launch" | "oauth" | "history" | "logs";
 const nav: { id: Tab; label: string; symbol: string }[] = [
   { id: "overview", label: "Overview", symbol: "◫" },
   { id: "setup", label: "App setup", symbol: "◇" },
@@ -16,6 +18,7 @@ const nav: { id: Tab; label: string; symbol: string }[] = [
   { id: "launch", label: "Launch inspector", symbol: "↗" },
   { id: "oauth", label: "OAuth playground", symbol: "⇄" },
   { id: "history", label: "Run history", symbol: "◷" },
+  { id: "logs", label: "Request logs", symbol: "≡" },
 ];
 export function Console() {
   const router = useRouter();
@@ -213,6 +216,7 @@ export function Console() {
                   <Overview boot={boot} runs={runs} onNavigate={setTab} />
                 </>
               )}
+              {tab === "logs" && <RequestLogs />}
               {tab === "profiles" && (
                 <SavedProfiles boot={boot} request={request} onSave={refresh} />
               )}

@@ -9,6 +9,7 @@ import type {
   Registration,
   AppProfile,
   ProfileInput,
+  HttpLog,
 } from "@/lib/contracts";
 export const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
@@ -23,6 +24,7 @@ export type LaunchSnapshot = {
   campusBase?: string;
   issuer?: string;
   profile?: InspectionResult["profile"];
+  logId?: string;
 };
 export class Store {
   readonly db: Database.Database;
@@ -44,6 +46,9 @@ export class Store {
         "utf8",
       ),
     );
+    this.db.exec(
+      readFileSync(join(process.cwd(), "migrations/003_http_logs.sql"), "utf8"),
+    );
     this.db.pragma("foreign_keys = ON");
     this.prune();
   }
@@ -54,6 +59,14 @@ export class Store {
     this.db.transaction(() => {
       for (const table of ["launches", "sessions", "quotas"])
         this.db.prepare(`DELETE FROM ${table} WHERE expires <= ?`).run(now);
+      this.db
+        .prepare("DELETE FROM http_logs WHERE created<=?")
+        .run(now - 86400000);
+      this.db
+        .prepare(
+          "DELETE FROM http_logs WHERE id NOT IN (SELECT id FROM http_logs ORDER BY created DESC,rowid DESC LIMIT 500)",
+        )
+        .run();
       this.db
         .prepare("DELETE FROM runs WHERE created <= ?")
         .run(now - 86400000);
@@ -209,6 +222,37 @@ export class Store {
         .get(bucket, Date.now() + windowMs) as { count: number };
       return r.count <= max;
     })();
+  }
+  saveHttpLog(log: HttpLog) {
+    this.db.transaction(() => {
+      this.db
+        .prepare("INSERT INTO http_logs VALUES (?,?,?)")
+        .run(log.id, Date.parse(log.createdAt), JSON.stringify(log));
+      this.prune();
+    })();
+    return log;
+  }
+  httpLogs(now = Date.now()): HttpLog[] {
+    return (
+      this.db
+        .prepare(
+          "SELECT evidence FROM http_logs WHERE created>? ORDER BY created DESC,rowid DESC LIMIT 500",
+        )
+        .all(now - 86400000) as { evidence: string }[]
+    ).map((row) => JSON.parse(row.evidence) as HttpLog);
+  }
+  httpLog(id: string) {
+    const row = this.db
+      .prepare("SELECT evidence FROM http_logs WHERE id=? AND created>?")
+      .get(id, Date.now() - 86400000) as { evidence: string } | undefined;
+    return row ? (JSON.parse(row.evidence) as HttpLog) : undefined;
+  }
+  linkHttpLog(id: string, runId: string) {
+    const log = this.httpLog(id);
+    if (log)
+      this.db
+        .prepare("UPDATE http_logs SET evidence=? WHERE id=?")
+        .run(JSON.stringify({ ...log, runId }), id);
   }
   saveRun(run: InspectionResult) {
     this.db.transaction(() => {

@@ -52,7 +52,8 @@ Never put secrets in `NEXT_PUBLIC_*`. The UI shows only non-secret environment c
 4. Obtain a fresh prepared launch reference through the authorized harness described in [the QA runbook](docs/qa.md). Open **Launch inspector** using its original user ID. This is a real browser redirect and cross-site form-post.
 5. Inspect individual checks and technical claims. Signature verification alone does not imply all binding checks passed. Untrusted decoded claims are labeled; identity checks are not run after signature failure.
 6. Run the seven OAuth scenarios. A negative case passes only on the expected rejection. Replay requires a fully verified first bearer token, then reuses the identical assertion. Network, JWKS and fixture prerequisites block the inspection. Rate limits preserve status and numeric rate-limit metadata; requests are never retried.
-7. Export privacy-safe evidence for QA tickets. Exports omit claims, request context and response bodies. Authenticated history contains only allowlisted technical claims; treat its IDs and roles as sensitive.
+7. Open **Request logs** to inspect redacted request/response bodies, HTTP status, timing and safe headers across OAuth, JWKS and OIDC traffic. Run details show correlated entries. See [request logs](docs/request-logs.md).
+8. Export privacy-safe evidence for QA tickets. Exports omit claims, request context and response bodies. Authenticated history contains only allowlisted technical claims; treat its IDs and roles as sensitive.
 
 Campus rejects private/localhost registered JWKS URLs through its own SSRF policy. Keep TLS and SSRF verification enabled. See [deployment](docs/deployment.md), [architecture](docs/architecture.md), [security and privacy](docs/security.md), and [verification results](docs/qa-results.md).
 

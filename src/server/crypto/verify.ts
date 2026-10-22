@@ -6,7 +6,11 @@ import {
   importJWK,
   type JWK,
 } from "jose";
-import { campusRequest, UpstreamError } from "@/server/campus/client";
+import {
+  campusRequest,
+  UpstreamError,
+  type HttpLogRecorder,
+} from "@/server/campus/client";
 import { audience, type Config } from "@/server/config";
 import {
   contextPrefix as prefix,
@@ -22,9 +26,17 @@ export const jwksObservation = (config?: Config) =>
   !config || observationSource === config.campusBase + "\n" + config.issuer
     ? observation
     : { status: "Not fetched" };
-export async function platformKeys(c: Config): Promise<JWK[]> {
+export async function platformKeys(
+  c: Config,
+  record?: HttpLogRecorder,
+): Promise<JWK[]> {
+  const res = await campusRequest(
+    c,
+    "/.well-known/jwks.json",
+    undefined,
+    record,
+  );
   try {
-    const res = await campusRequest(c, "/.well-known/jwks.json");
     if (res.status !== 200)
       throw new UpstreamError({ status: res.status, rateLimit: res.rateLimit });
     const data = res.body as { keys?: unknown } | null;
@@ -86,7 +98,12 @@ export type Binding = {
   installation?: string;
   scope?: string;
 };
-export async function verifyToken(c: Config, token: string, b: Binding) {
+export async function verifyToken(
+  c: Config,
+  token: string,
+  b: Binding,
+  record?: HttpLogRecorder,
+) {
   const checks: CheckResult[] = [];
   const check = (name: string, ok: boolean, message: string) => {
     checks.push({ name, status: ok ? "passed" : "failed", message });
@@ -126,7 +143,7 @@ export async function verifyToken(c: Config, token: string, b: Binding) {
       typeof header.kid === "string" &&
       header.kid
     ) {
-      const keys = await platformKeys(c);
+      const keys = await platformKeys(c, record);
       const key = keys.find((k) => k.kid === header.kid);
       try {
         if (!key) throw new Error();

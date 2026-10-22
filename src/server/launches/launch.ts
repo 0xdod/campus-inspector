@@ -7,7 +7,8 @@ import { fail } from "@/server/http";
 import { verifyToken } from "@/server/crypto/verify";
 import { UpstreamError } from "@/server/campus/client";
 import type { ProfileConfig } from "@/server/profiles/service";
-import type { InspectionResult } from "@/lib/contracts";
+import { newHttpLog, redactedURL } from "@/server/logs/redaction";
+import type { InspectionResult, HttpLog } from "@/lib/contracts";
 const boundedText = z
   .string()
   .min(1)
@@ -42,7 +43,7 @@ export function startLaunch(
   const state = secret(),
     nonce = parsed.nonce || secret();
   const now = Date.now();
-  s.addLaunch(state, {
+  const snapshot = {
     created: now,
     campusBase: c.campusBase,
     issuer: c.issuer,
@@ -61,7 +62,7 @@ export function startLaunch(
     installation: r.installation_id,
     nonce,
     expires: now + 300000,
-  });
+  };
   const url = new URL(campusURL(c, "/apps/oidc/login"));
   url.search = new URLSearchParams({
     state,
@@ -76,6 +77,19 @@ export function startLaunch(
     prompt: "none",
     target_link_uri: c.publicUrl + "/oidc/callback",
   }).toString();
+  const log = newHttpLog("oidc", "browser_redirect", {
+    method: "GET",
+    url: redactedURL(url.toString()),
+    headers: {},
+    body: null,
+  });
+  log.profile = snapshot.profile;
+  log.note =
+    "Prepared browser redirect. The inspector cannot observe the Campus response unless a callback arrives.";
+  s.db.transaction(() => {
+    s.addLaunch(state, { ...snapshot, logId: log.id });
+    s.saveHttpLog(log);
+  })();
   return url.toString();
 }
 export function publicInitiation(
@@ -149,6 +163,8 @@ export async function callback(
       content_type: "application/x-www-form-urlencoded",
     },
   };
+  const record = (log: HttpLog) =>
+    s.saveHttpLog({ ...log, runId: run.id, profile: run.profile });
   try {
     const result = await verifyToken(
       {
@@ -158,6 +174,7 @@ export async function callback(
       },
       token,
       { kind: "oidc", ...snapshot },
+      record,
     );
     run.checks.push(...result.checks);
     run.header = result.header;
@@ -184,5 +201,9 @@ export async function callback(
       message: "Public keys unavailable or rejected; verification blocked",
     });
   }
-  return s.saveRun(run);
+  return s.db.transaction(() => {
+    s.saveRun(run);
+    if (snapshot.logId) s.linkHttpLog(snapshot.logId, run.id);
+    return run;
+  })();
 }
