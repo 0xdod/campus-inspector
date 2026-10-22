@@ -68,6 +68,8 @@ async function performCampusRequest(
 }> {
   const u = new URL(campusURL(c, path));
   const hostname = u.hostname.replace(/^\[|\]$/g, "");
+  // OAuth can include Campus fetching this app's JWKS through a second tunnel.
+  const requestTimeoutMs = path === "/apps/oauth2/token" ? 15000 : 5000;
   try {
     const addresses = isIP(hostname)
       ? [{ address: hostname, family: isIP(hostname) }]
@@ -155,7 +157,10 @@ async function performCampusRequest(
           });
         },
       );
-      const deadline = setTimeout(() => req.destroy(new UpstreamError()), 5000);
+      const deadline = setTimeout(
+        () => req.destroy(new UpstreamError()),
+        requestTimeoutMs,
+      );
       deadline.unref();
       req.on("error", () => {
         clearTimeout(deadline);

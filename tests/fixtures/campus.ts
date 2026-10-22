@@ -139,6 +139,9 @@ export async function fixtureCampus(
     for await (const chunk of req) buffers.push(Buffer.from(chunk));
     const form = new URLSearchParams(Buffer.concat(buffers).toString());
     requests.push(form);
+    if (mode === "token_timeout") return;
+    if (mode === "token_slow")
+      await new Promise((resolve) => setTimeout(resolve, 6000));
     if (mode === "rate_limit") {
       res.setHeader("Retry-After", "60");
       send(res, 429, {

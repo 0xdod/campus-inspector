@@ -270,6 +270,34 @@ it("blocks a JWKS timeout and does not retry", async () => {
   fixture.setMode("jwks_timeout");
   await expect(platformKeys(c)).rejects.toThrow();
 }, 7000);
+it("verifies an OAuth response delayed by backend key retrieval and tunnel latency without retrying", async () => {
+  fixture.setMode("token_slow");
+  const run = await runOAuth(c, s, keys, {
+    scenario: "valid",
+    scope: "campus.webhooks.write",
+  });
+  expect(run.status).toBe("passed");
+  expect(fixture.requests()).toHaveLength(1);
+  const log = s
+    .httpLogs()
+    .find((entry) => entry.runId === run.id && entry.kind === "oauth");
+  expect(log?.outcome).toBe("completed");
+  expect(log?.response?.status).toBe(200);
+}, 10000);
+it("bounds an unresponsive OAuth request and records unavailable evidence without retrying", async () => {
+  fixture.setMode("token_timeout");
+  const run = await runOAuth(c, s, keys, {
+    scenario: "valid",
+    scope: "campus.webhooks.write",
+  });
+  expect(run.status).toBe("blocked");
+  expect(fixture.requests()).toHaveLength(1);
+  const log = s
+    .httpLogs()
+    .find((entry) => entry.runId === run.id && entry.kind === "oauth");
+  expect(log?.outcome).toBe("unavailable");
+  expect(log?.response).toBeUndefined();
+}, 18000);
 it("never trusts claims from a tampered signature or unknown kid", async () => {
   const signed = await fixture.sign(fixture.identity("nonce"));
   for (const token of [
