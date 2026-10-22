@@ -36,7 +36,7 @@ export function readConfig(
       throw new Error(`Invalid ${name}`);
     return raw;
   }
-  const publicUrl = url("PUBLIC_URL", true).replace(/\/$/, "");
+  const publicUrl = new URL(url("PUBLIC_URL", true)).origin;
   const campusBase = url("CAMPUS_BASE_URL").replace(/\/+$/, "");
   const issuer = url("CAMPUS_ISSUER");
   if (

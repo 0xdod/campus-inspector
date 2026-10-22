@@ -65,7 +65,10 @@ it("returns generic 500 and logs no error content for unexpected storage failure
   });
   expect(response.status).toBe(500);
   expect(JSON.stringify(await response.json())).not.toMatch(/SQLITE|SENTINEL/);
-  expect(log).toHaveBeenCalledWith("inspector_request_failed");
+  expect(log).toHaveBeenCalledWith(
+    "inspector_request_failed",
+    expect.any(String),
+  );
   log.mockRestore();
 });
 it.each([401, 403, 404, 422, 429])(
@@ -77,3 +80,12 @@ it.each([401, 403, 404, 422, 429])(
     expect(response.status).toBe(status);
   },
 );
+it("returns 400 for a nonnumeric original user ID instead of a runtime conversion error", async () => {
+  const { launchSchema } = await import("@/server/launches/launch");
+  const response = await handle(() => {
+    launchSchema.parse({ login_hint: "not-a-number", reference: "opaque" });
+    return Response.json({});
+  });
+  expect(response.status).toBe(400);
+  expect((await response.json()).errors[0].field).toBe("login_hint");
+});

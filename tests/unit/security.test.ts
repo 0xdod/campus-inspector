@@ -125,3 +125,15 @@ it("rejects private, reserved and mapped network addresses", () => {
     expect(forbiddenAddress(addr), addr).toBe(true);
   expect(forbiddenAddress("8.8.8.8")).toBe(false);
 });
+it("fails safely when the configured storage directory is a file or the key is invalid", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "invalid-storage-"));
+  const { writeFileSync } = await import("node:fs");
+  try {
+    writeFileSync(join(dir, "not-a-directory"), "fixture");
+    expect(() => new Store(join(dir, "not-a-directory"))).toThrow();
+    writeFileSync(join(dir, "app-signing.pem"), "not a private key");
+    await expect(loadKeys(dir)).rejects.toThrow();
+  } finally {
+    rmSync(dir, { force: true, recursive: true });
+  }
+});

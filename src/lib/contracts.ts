@@ -13,6 +13,7 @@ export type InspectionResult = {
   durationMs?: number;
   expected?: { status: number; error?: string };
   exchanges?: {
+    endpoint?: "token" | "jwks";
     status: number;
     error?: string;
     response: Record<string, unknown>;

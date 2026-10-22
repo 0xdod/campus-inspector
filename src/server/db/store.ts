@@ -8,6 +8,7 @@ export const hash = (value: string) =>
   createHash("sha256").update(value).digest("hex");
 export const secret = () => randomBytes(32).toString("base64url");
 export type LaunchSnapshot = {
+  created: number;
   user: string;
   client: string;
   installation?: string;

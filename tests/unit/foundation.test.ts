@@ -40,6 +40,7 @@ describe("durable storage", () => {
         installation_id: "fixture-install",
       });
       s.addLaunch("state-secret", {
+        created: Date.now(),
         user: "7",
         client: "fixture-client",
         installation: "fixture-install",
@@ -51,9 +52,19 @@ describe("durable storage", () => {
       );
       expect(outcomes.filter(Boolean)).toHaveLength(1);
       expect(s.db.prepare("SELECT * FROM launches").all()).toHaveLength(0);
+      const session = s.newSession();
+      s.saveRun({
+        id: "fixture-durable-run",
+        kind: "oidc",
+        status: "blocked",
+        createdAt: new Date().toISOString(),
+        checks: [],
+      });
       s.close();
       const restart = new Store(dir);
       expect(restart.registration().client_id).toBe("fixture-client");
+      expect(restart.session(session.token)?.csrf).toBe(session.csrf);
+      expect(restart.run("fixture-durable-run")?.status).toBe("blocked");
       restart.close();
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -78,4 +89,46 @@ describe("durable storage", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+});
+it("expires sessions and launch snapshots and physically prunes stale records", () => {
+  const dir = mkdtempSync(join(tmpdir(), "expiry-"));
+  const s = new Store(dir);
+  try {
+    const session = s.newSession();
+    s.addLaunch("expired-state", {
+      created: Date.now() - 300001,
+      user: "7",
+      client: "fixture-client",
+      nonce: "private-nonce",
+      expires: Date.now() - 1,
+    });
+    expect(s.consumeLaunch("expired-state")).toBeUndefined();
+    s.db.prepare("UPDATE sessions SET expires=?").run(Date.now() - 1);
+    expect(s.session(session.token)).toBeUndefined();
+    s.prune();
+    expect(s.db.prepare("SELECT count(*) AS n FROM sessions").get()).toEqual({
+      n: 0,
+    });
+    expect(s.db.prepare("SELECT count(*) AS n FROM launches").get()).toEqual({
+      n: 0,
+    });
+  } finally {
+    s.close();
+    rmSync(dir, { force: true, recursive: true });
+  }
+});
+it("appends a direct backend path without changing the issuer", () => {
+  const c = readConfig({ ...env, CAMPUS_BASE_URL: "http://localhost:8081" });
+  expect(campusURL(c, "/.well-known/jwks.json")).toBe(
+    "http://localhost:8081/.well-known/jwks.json",
+  );
+});
+it("canonicalizes the public origin while preserving exact issuer", () => {
+  const c = readConfig({
+    ...env,
+    PUBLIC_URL: "https://Inspector.Example:443/",
+    CAMPUS_ISSUER: "https://Issuer.Example/",
+  });
+  expect(c.publicUrl).toBe("https://inspector.example");
+  expect(c.issuer).toBe("https://Issuer.Example/");
 });

@@ -10,7 +10,7 @@
     "dev": "next dev",
     "build": "next build --webpack && node scripts/prepare-standalone.mjs",
     "start": "node scripts/start.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "playwright test",

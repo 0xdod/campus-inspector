@@ -1,5 +1,6 @@
 import "server-only";
 import { z } from "zod";
+import { randomUUID } from "node:crypto";
 export class AppError extends Error {
   constructor(
     readonly code: number,
@@ -28,6 +29,7 @@ const statuses: Record<number, string> = {
   500: "Internal Server Error",
 };
 export async function handle(fn: () => Promise<Response> | Response) {
+  const requestId = randomUUID();
   try {
     return await fn();
   } catch (e) {
@@ -53,7 +55,7 @@ export async function handle(fn: () => Promise<Response> | Response) {
         },
         e.code,
       );
-    console.error("inspector_request_failed");
+    console.error("inspector_request_failed", requestId);
     return json(
       {
         status: "Internal Server Error",
@@ -61,6 +63,7 @@ export async function handle(fn: () => Promise<Response> | Response) {
         errors: [],
       },
       500,
+      { "X-Request-Id": requestId },
     );
   }
 }
