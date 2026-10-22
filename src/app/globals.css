@@ -1,13 +1,24 @@
 :root {
-  --canvas: #f5f6f3;
-  --surface: #fff;
-  --ink: #202d2b;
-  --muted: #64716c;
-  --border: #dce2dc;
-  --accent: #176a50;
-  --accent-soft: #eaf2eb;
-  --danger: #a22e35;
-  --amber: #795016;
+  color-scheme: dark;
+  --canvas: #101513;
+  --surface: #19211d;
+  --chrome: #131a16;
+  --ink: #e5eee8;
+  --muted: #a3b3a9;
+  --border: #34433a;
+  --control-border: #607467;
+  --accent: #79e3aa;
+  --on-accent: #102218;
+  --accent-soft: #1b3326;
+  --accent-border: #355e46;
+  --code-surface: #101a14;
+  --code-ink: #c2dfca;
+  --danger: #ffa1aa;
+  --danger-soft: #371f26;
+  --danger-border: #72414c;
+  --amber: #f0cf8b;
+  --amber-soft: #332c1d;
+  --amber-border: #6c5933;
   --radius: 8px;
   --mono: ui-monospace, SFMono-Regular, Consolas, monospace;
 }
@@ -34,7 +45,7 @@ button,
   border: 1px solid var(--accent);
   border-radius: 5px;
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
   padding: 10px 16px;
   font-weight: 600;
   display: inline-flex;
@@ -45,7 +56,7 @@ button,
 }
 button:hover,
 .button:hover {
-  filter: brightness(0.94);
+  filter: brightness(1.08);
 }
 button:disabled {
   cursor: wait;
@@ -55,7 +66,7 @@ a {
   color: var(--accent);
 }
 :focus-visible {
-  outline: 3px solid #c58d22;
+  outline: 3px solid var(--accent);
   outline-offset: 3px;
 }
 h1,
@@ -96,7 +107,7 @@ code {
 }
 pre {
   font-size: 12px;
-  background: #f4f6f3;
+  background: var(--code-surface);
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 16px;
@@ -104,7 +115,7 @@ pre {
   word-break: break-word;
   max-width: 100%;
   overflow: auto;
-  color: #374b41;
+  color: var(--code-ink);
 }
 hr {
   border: 0;
@@ -138,7 +149,7 @@ hr {
   display: grid;
   place-items: center;
   background: var(--accent);
-  color: white;
+  color: var(--on-accent);
   font:
     600 23px Georgia,
     serif;
@@ -164,7 +175,7 @@ hr {
   top: 0;
   height: 100vh;
   padding: 32px 20px 24px;
-  background: #fafbf8;
+  background: var(--chrome);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
@@ -183,7 +194,7 @@ hr {
 .sidebar nav button {
   background: transparent;
   border: 0;
-  color: #53625b;
+  color: var(--muted);
   font-size: 13px;
   font-weight: 500;
   justify-content: flex-start;
@@ -234,7 +245,7 @@ hr {
 }
 .topbar {
   height: 70px;
-  background: #fafbf8;
+  background: var(--chrome);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -296,7 +307,7 @@ main {
   align-items: center;
   gap: 16px;
   background: var(--accent-soft);
-  border: 1px solid #cfddcf;
+  border: 1px solid var(--accent-border);
   border-radius: var(--radius);
   padding: 18px 20px;
   margin-bottom: 24px;
@@ -381,20 +392,20 @@ main {
 }
 .neutral {
   color: var(--muted);
-  background: #f0f3ef;
+  background: var(--chrome);
   border: 1px solid var(--border);
 }
 .passed {
-  background: #e9f4ed;
-  color: #17603e;
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 .failed {
-  background: #fbeaec;
+  background: var(--danger-soft);
   color: var(--danger);
 }
 .blocked,
 .not_run {
-  background: #fbf2df;
+  background: var(--amber-soft);
   color: var(--amber);
 }
 .journey ol {
@@ -437,7 +448,7 @@ main {
 }
 .empty > span {
   font-size: 32px;
-  color: #8b9f8f;
+  color: var(--muted);
   display: block;
   margin-bottom: 16px;
 }
@@ -476,9 +487,9 @@ input,
 select {
   width: 100%;
   min-width: 0;
-  border: 1px solid #bdc8bf;
+  border: 1px solid var(--control-border);
   border-radius: 5px;
-  background: white;
+  background: var(--code-surface);
   padding: 11px 12px;
   color: var(--ink);
 }
@@ -524,16 +535,16 @@ details p {
 }
 .notice {
   padding: 14px 16px;
-  background: #fbf6e9;
-  border: 1px solid #eee0bb;
+  background: var(--amber-soft);
+  border: 1px solid var(--amber-border);
   border-radius: 5px;
   font-size: 12px;
-  color: #725529;
+  color: var(--amber);
   margin: 20px 0;
 }
 .error {
-  background: #fceef0;
-  border: 1px solid #e8c5cb;
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
   border-radius: 5px;
   padding: 12px;
   color: var(--danger);
@@ -847,4 +858,20 @@ details p {
     margin-left: 0;
     justify-self: start;
   }
+}
+
+input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+input {
+  caret-color: var(--accent);
+}
+::selection {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.sidebar nav button:hover:not(.active),
+.run-list > button:hover {
+  background: var(--accent-soft);
 }
