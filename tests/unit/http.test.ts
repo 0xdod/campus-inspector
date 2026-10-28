@@ -105,3 +105,17 @@ it("preserves API errors originating from a separate server bundle", async () =>
   expect(response.status).toBe(404);
   expect((await response.json()).errors[0].field).toBe("profile_id");
 });
+
+it("permits a bounded webhook wrapper without increasing other route limits", async () => {
+  const raw = JSON.stringify({ body: "x".repeat(262145) });
+  const req = () =>
+    new Request("https://inspector.example/api/webhooks", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: raw,
+    });
+  await expect(bodyJSON(req())).rejects.toThrow("size limit");
+  expect(await bodyJSON(req(), 2 * 1024 * 1024)).toMatchObject({
+    body: "x".repeat(262145),
+  });
+});

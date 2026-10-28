@@ -106,10 +106,10 @@ export async function boundedText(req: Request, max = 16384) {
     fail(400, "body", "body must contain valid UTF-8");
   }
 }
-export async function bodyJSON(req: Request) {
+export async function bodyJSON(req: Request, max = 16384) {
   if (req.headers.get("content-type")?.split(";")[0] !== "application/json")
     fail(400, "body", "body must use application/json");
-  const text = await boundedText(req);
+  const text = await boundedText(req, max);
   try {
     return JSON.parse(text) as unknown;
   } catch {

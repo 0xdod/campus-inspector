@@ -6,7 +6,7 @@ export type CheckResult = {
 export type InspectionResult = {
   profile?: { id: string; name: string; campusBase: string; issuer: string };
   id: string;
-  kind: "oidc" | "oauth";
+  kind: "oidc" | "oauth" | "webhook";
   status: "passed" | "failed" | "blocked";
   createdAt: string;
   checks: CheckResult[];
@@ -14,7 +14,7 @@ export type InspectionResult = {
   durationMs?: number;
   expected?: { status: number; error?: string };
   exchanges?: {
-    endpoint?: "token" | "jwks";
+    endpoint?: "token" | "jwks" | "webhook";
     status: number;
     error?: string;
     response: Record<string, unknown>;
@@ -63,7 +63,7 @@ export type Scenario = (typeof scenarios)[number];
 export type HttpLog = {
   id: string;
   createdAt: string;
-  kind: "oidc" | "oauth" | "jwks";
+  kind: "oidc" | "oauth" | "jwks" | "webhook";
   direction: "server" | "inbound" | "browser_redirect";
   outcome: "completed" | "unavailable" | "unobserved";
   durationMs?: number;

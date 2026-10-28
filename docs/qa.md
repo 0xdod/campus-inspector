@@ -38,3 +38,7 @@ Start with the original positive user ID. The inspector redirects to Campus with
 A negative run passes only on the expected rejection; upstream network/keys/timeouts/429/5xx/non-JSON/redirects block the run. A `200 {}` first replay response is blocked and never replayed. Custom requested scope is a deliberate test input; only requested/granted campus.webhooks.write can pass successful issuance validation. Invalid envelopes or binding checks fail.
 
 Use the authenticated history detail to inspect checks. Export JSON excludes claims/context and reflected upstream descriptions. Do not attach raw bearer tokens, assertions, passwords or references to tickets. Record deployment issuer/base, fixture preparation method and exact observed live outcome separately. Live Campus registration, authorized fixtures, public JWKS reachability and Campus-side nonce/key-cache behavior require live validation before asserting staging readiness.
+
+## Inbound webhook QA
+
+Use the [Webhooks playground guide](webhooks.md) for first receipt, error presets, raw-body validation, exact size boundaries and manual database/audit checks. A passing HTTP inspection alone does not verify backend persistence.

@@ -278,3 +278,7 @@ No implementation is requested by this handoff-writing task. The rebuild agent s
 ## Definition of done
 
 A separate Next.js repository independently runs frontend and server routes, passes typecheck/lint/unit/integration/browser tests and production build, and runs successfully in Docker with durable keys/storage. QA can register its public URLs, supply authorized Campus fixtures, inspect real OIDC launches, and execute all seven OAuth scenarios. Evidence is honest and redacted. Documentation clearly states environment selection, public HTTPS requirements, fixture dependencies, single-replica storage, and deferred webhooks. No Go installation, process, source dependency, or build step is required.
+
+## Approved extension: inbound webhook playground
+
+The webhook deferral and prohibition in the original version scope above are superseded by the approved webhook playground extension. Inspector now supports authenticated first-receipt calls, validation presets and bounded raw-body forwarding; see webhooks.md. Existing security, redaction, profile isolation and evidence requirements still apply. Domain processing, automatic retries and load generation remain outside this increment.

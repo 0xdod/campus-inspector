@@ -17,3 +17,7 @@ The original one-app/environment limitation is superseded by the user's requirem
 ## Integration traffic logging
 
 A separate bounded http_logs table records redacted integration traffic, including prepared redirects that never return a callback. HTTP transport accepts a recorder so OAuth/JWKS observations remain correlated to the run/profile captured for that operation. Bodies are allowlisted/redacted before persistence. Callback/initiation wrappers record inbound form shape and the inspector response; redirects do not claim to observe Campus's browser response. Historical evidence export remains independent of detailed log bodies. Migration 003 is additive.
+
+## Inbound webhook inspection
+
+The Webhooks playground calls authenticated POST /api/webhooks. The server uses the captured profile and a shared client-assertion helper to obtain and verify a fresh service token, then submits raw JSON through the existing destination-checked, DNS-pinned Campus transport. No token cache, database migration, backend change, queue or domain handler is introduced. New webhook run/log kinds share existing retention and redacted evidence export. See webhooks.md for separate wrapper/event size limits and result semantics.
