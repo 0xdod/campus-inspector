@@ -17,7 +17,8 @@ export function RunDetail({
           <h3>
             {run.kind === "oidc"
               ? "OIDC launch"
-              : run.scenario?.replaceAll("_", " ")}
+              : (run.kind === "webhook" ? "Webhook · " : "") +
+                run.scenario?.replaceAll("_", " ")}
           </h3>
           <p className="caption">
             {new Date(run.createdAt).toLocaleString()} · <code>{run.id}</code>

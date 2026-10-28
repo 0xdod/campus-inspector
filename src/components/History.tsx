@@ -35,7 +35,8 @@ export function History({
                 <strong>
                   {r.kind === "oidc"
                     ? "OIDC launch"
-                    : r.scenario?.replaceAll("_", " ")}
+                    : (r.kind === "webhook" ? "Webhook · " : "") +
+                      r.scenario?.replaceAll("_", " ")}
                 </strong>
                 <small>
                   {new Date(r.createdAt).toLocaleString()}

@@ -39,3 +39,14 @@ The normal setup path now uses the existing authenticated student/admin Campus A
 ## OAuth timeout follow-up
 
 A live tunnel observation showed Campus returning HTTP 200 after the inspector's five-second request deadline had elapsed; the inspector correctly recorded unavailable evidence, but its deadline was too short for the round trip plus Campus fetching the app's JWKS. OAuth now permits a fifteen-second request deadline, retaining a separate five-second DNS deadline, the five-second platform JWKS request deadline, body limits, destination checks and no retries. A six-second successful token fixture failed before this fix and fully verifies afterward. A hanging OAuth fixture is still blocked with unavailable evidence and exactly one request. All 95 unit/integration tests, lint and typecheck passed. Live OAuth was not reissued by the agent after this change.
+
+## Webhook playground verification — 2026-10-28
+
+- npm test: 131 unit/integration tests passed across 8 files.
+- npm run typecheck and npm run lint: passed.
+- npm run build: production webpack/standalone build passed.
+- npm run test:e2e: all 5 Chromium browser tests passed against that build.
+- Browser coverage includes new receipt, wrong-data rejection, forwarding a 262145-byte event to Campus for 413, editable raw envelopes, redacted exports and 320px responsive navigation. Desktop screenshot: test-results/webhooks-desktop.png.
+- Integration coverage includes every webhook preset, exact size boundaries, verified token prerequisites, profile isolation, unknown receipt after timeout, no retry, local authentication/CSRF/quota/size controls and credential/payload redaction.
+- A multibyte raw body exceeding 300000 UTF-8 bytes is rejected before token acquisition. Existing APIs retain the original 16 KiB JSON cap.
+- These checks use an HTTP/RSA fixture. Live Campus tenant ownership, original envelope/hash/timestamps, receipt audit and absence of domain/outbound side effects require the manual checks in webhooks.md; no live Campus event was submitted during this verification.

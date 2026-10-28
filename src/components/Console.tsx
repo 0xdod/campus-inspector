@@ -7,16 +7,25 @@ import { RequestLogs } from "./RequestLogs";
 import { SavedProfiles } from "./SavedProfiles";
 import { Setup } from "./Setup";
 import { Playgrounds } from "./Playgrounds";
+import { Webhooks } from "./Webhooks";
 import { History } from "./History";
 import { Overview } from "./Overview";
 type Tab =
-  "overview" | "setup" | "profiles" | "launch" | "oauth" | "history" | "logs";
+  | "overview"
+  | "setup"
+  | "profiles"
+  | "launch"
+  | "oauth"
+  | "webhooks"
+  | "history"
+  | "logs";
 const nav: { id: Tab; label: string; symbol: string }[] = [
   { id: "overview", label: "Overview", symbol: "◫" },
   { id: "setup", label: "App setup", symbol: "◇" },
   { id: "profiles", label: "Saved apps", symbol: "▦" },
   { id: "launch", label: "Launch inspector", symbol: "↗" },
   { id: "oauth", label: "OAuth playground", symbol: "⇄" },
+  { id: "webhooks", label: "Webhooks playground", symbol: "↓" },
   { id: "history", label: "Run history", symbol: "◷" },
   { id: "logs", label: "Request logs", symbol: "≡" },
 ];
@@ -222,6 +231,18 @@ export function Console() {
               )}
               {tab === "setup" && (
                 <Setup boot={boot} request={request} onSave={refresh} />
+              )}
+              {tab === "webhooks" && (
+                <Webhooks
+                  key={boot.activeProfileId || "default"}
+                  boot={boot}
+                  request={request}
+                  onResult={async (run) => {
+                    await refresh();
+                    setSelected(run);
+                    setTab("history");
+                  }}
+                />
               )}
               {(tab === "launch" || tab === "oauth") && (
                 <Playgrounds
