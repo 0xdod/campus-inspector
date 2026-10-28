@@ -35,6 +35,7 @@ export async function fixtureCampus(
   const seen = new Set<string>(),
     references = new Set<string>();
   let requests: URLSearchParams[] = [];
+  let webhooks: { body: string; authorization: string }[] = [];
   const sign = async (
     claims: JWTPayload,
     header: Record<string, unknown> = {},
@@ -129,6 +130,88 @@ export async function fixtureCampus(
       res.end(
         `<html><body><form method="post" action="${callback}"><input name="state" value="${p.get("state")}"><input name="id_token" value="${token}"></form><script>document.forms[0].submit()</script></body></html>`,
       );
+      return;
+    }
+    if (path === "/apps/webhooks") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) chunks.push(Buffer.from(chunk));
+      const raw = Buffer.concat(chunks).toString("utf8");
+      webhooks.push({
+        body: raw,
+        authorization: req.headers.authorization || "",
+      });
+      const error = (status: number, field: string) =>
+        send(res, status, {
+          status:
+            status === 400
+              ? "Bad Request"
+              : status === 401
+                ? "Unauthorized"
+                : status === 413
+                  ? "Request Entity Too Large"
+                  : "Unprocessable Entity",
+          message: "Validation failed",
+          errors: [{ field, message: "SENTINEL-REFLECTED-PAYLOAD" }],
+        });
+      if (mode === "webhook_timeout") return;
+      if (mode === "webhook_rate_limit") {
+        res.setHeader("Retry-After", "60");
+        send(res, 429, { message: "SENTINEL" });
+        return;
+      }
+      if (mode === "webhook_server_error") {
+        send(res, 500, { message: "SENTINEL" });
+        return;
+      }
+      if (mode === "webhook_redirect") {
+        res.writeHead(302, { location: inspector });
+        res.end();
+        return;
+      }
+      if (mode === "webhook_non_json") {
+        res.end("SENTINEL");
+        return;
+      }
+      try {
+        await compactVerify(
+          (req.headers.authorization || "").slice(7),
+          key.publicKey,
+        );
+      } catch {
+        error(401, "Authorization");
+        return;
+      }
+      if (Buffer.byteLength(raw) > 262144) {
+        error(413, "body");
+        return;
+      }
+      let event: Record<string, unknown>;
+      try {
+        event = JSON.parse(raw);
+      } catch {
+        error(400, "body");
+        return;
+      }
+      if (
+        !event.data ||
+        typeof event.data !== "object" ||
+        Array.isArray(event.data)
+      ) {
+        error(400, "data");
+        return;
+      }
+      if (event.installation_id !== "fixture-install") {
+        error(422, "installation_id");
+        return;
+      }
+      if (event.type !== "qa.inspection.completed") {
+        error(422, "type");
+        return;
+      }
+      send(res, 202, {
+        id: mode === "webhook_bad_receipt" ? "wrong" : event.id,
+        status: "received",
+      });
       return;
     }
     if (path !== "/apps/oauth2/token") {
@@ -239,11 +322,13 @@ export async function fixtureCampus(
     setMode: (value: string) => {
       mode = value;
       requests = [];
+      webhooks = [];
     },
     changeToken: (fn: (c: JWTPayload) => JWTPayload) => {
       tokenChange = fn;
     },
     requests: () => requests,
+    webhooks: () => webhooks,
     close: () =>
       new Promise<void>((resolve, reject) => {
         server.closeAllConnections();

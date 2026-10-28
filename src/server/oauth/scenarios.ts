@@ -1,5 +1,5 @@
 import "server-only";
-import { SignJWT, generateKeyPair } from "jose";
+import { clientAssertion } from "./token";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
@@ -7,7 +7,6 @@ import {
   type InspectionResult,
   type HttpLog,
 } from "@/lib/contracts";
-import { audience } from "@/server/config";
 import type { ProfileConfig } from "@/server/profiles/service";
 import type { Store } from "@/server/db/store";
 import type { loadKeys } from "@/server/crypto/keys";
@@ -80,26 +79,7 @@ export async function runOAuth(
   const record = (log: HttpLog) =>
     s.saveHttpLog({ ...log, runId: run.id, profile: run.profile });
   try {
-    const now = Math.floor(Date.now() / 1000);
-    const key =
-      scenario === "foreign_key"
-        ? (await generateKeyPair("RS256", { modulusLength: 2048 })).privateKey
-        : keys.privateKey;
-    const assertion = await new SignJWT({})
-      .setProtectedHeader({ alg: "RS256", kid: keys.kid })
-      .setIssuer(r.client_id)
-      .setSubject(r.client_id)
-      .setAudience(
-        scenario === "wrong_audience"
-          ? "https://wrong-audience.invalid/token"
-          : audience(c, "/apps/oauth2/token"),
-      )
-      .setIssuedAt(scenario === "expired_assertion" ? now - 600 : now)
-      .setExpirationTime(
-        scenario === "expired_assertion" ? now - 300 : now + 300,
-      )
-      .setJti(randomUUID())
-      .sign(key);
+    const assertion = await clientAssertion(c, keys, r.client_id, scenario);
     const form = new URLSearchParams({
       grant_type: "client_credentials",
       client_assertion_type:

@@ -56,10 +56,18 @@ export class UpstreamError extends Error {
     super("Campus transport or JWKS prerequisite unavailable");
   }
 }
+export type JSONCampusBody = { raw: string; bearer?: string };
+type CampusBody = URLSearchParams | JSONCampusBody;
+const rawBody = (body?: CampusBody) =>
+  body instanceof URLSearchParams ? body.toString() : body?.raw;
+const contentType = (body: CampusBody) =>
+  body instanceof URLSearchParams
+    ? "application/x-www-form-urlencoded"
+    : "application/json";
 async function performCampusRequest(
   c: Config,
   path: string,
-  body?: URLSearchParams,
+  body?: CampusBody,
 ): Promise<{
   status: number;
   body: unknown;
@@ -103,11 +111,14 @@ async function performCampusRequest(
           lookup: (_host, _options, cb) =>
             cb(null, address.address, address.family),
           headers: {
+            ...(body && !(body instanceof URLSearchParams) && body.bearer
+              ? { authorization: "Bearer " + body.bearer }
+              : {}),
             accept: "application/json",
             ...(body
               ? {
-                  "content-type": "application/x-www-form-urlencoded",
-                  "content-length": Buffer.byteLength(body.toString()),
+                  "content-type": contentType(body),
+                  "content-length": Buffer.byteLength(rawBody(body)!),
                 }
               : {}),
           },
@@ -166,7 +177,7 @@ async function performCampusRequest(
         clearTimeout(deadline);
         reject(new UpstreamError());
       });
-      req.end(body?.toString());
+      req.end(rawBody(body));
     });
   } catch {
     throw new UpstreamError();
@@ -177,19 +188,29 @@ export type HttpLogRecorder = (log: HttpLog) => void;
 export async function campusRequest(
   c: Config,
   path: string,
-  body?: URLSearchParams,
+  body?: CampusBody,
   record?: HttpLogRecorder,
 ) {
   const started = Date.now();
-  const kind = path === "/.well-known/jwks.json" ? "jwks" : "oauth";
+  const kind =
+    path === "/.well-known/jwks.json"
+      ? "jwks"
+      : path === "/apps/webhooks"
+        ? "webhook"
+        : "oauth";
   const log = newHttpLog(kind, "server", {
     method: body ? "POST" : "GET",
     url: redactedURL(campusURL(c, path)),
     headers: {
       accept: "application/json",
-      ...(body ? { "content-type": "application/x-www-form-urlencoded" } : {}),
+      ...(body ? { "content-type": contentType(body) } : {}),
     },
-    body: body ? httpRequestBody(body) : null,
+    body:
+      body instanceof URLSearchParams
+        ? httpRequestBody(body)
+        : body
+          ? { bytes: Buffer.byteLength(body.raw), envelope: "[REDACTED]" }
+          : null,
   });
   let result: Awaited<ReturnType<typeof performCampusRequest>>;
   try {
