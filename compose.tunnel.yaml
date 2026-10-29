@@ -1,0 +1,17 @@
+# Deploy separately from the app so app deployments do not restart the tunnel.
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --url
+      - ${TUNNEL_ORIGIN:?Set TUNNEL_ORIGIN to the app's internal HTTP URL}
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    external: true
+    name: ${TUNNEL_NETWORK:-dokploy-network}

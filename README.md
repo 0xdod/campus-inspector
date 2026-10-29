@@ -1,6 +1,6 @@
 # Campus App Inspector
 
-A standalone Next.js console for Campus engineers and QA to inspect actual Campus Apps OIDC launches and OAuth client credentials. Save named app/platform profiles, edit their settings and switch the active profile from **Saved apps**. Next.js serves the UI and backend; no Go source, process, installation, or backend checkout is needed. Webhook submission is deferred.
+A standalone Next.js console for Campus engineers and QA to inspect actual Campus Apps OIDC launches and OAuth client credentials. Save named app/platform profiles, edit their settings and switch the active profile from **Saved apps**. Next.js serves the UI and backend; no Go source, process, installation, or backend checkout is needed. The Webhooks playground sends inbound events to Campus using server-side service tokens.
 
 ## Run locally
 
@@ -48,13 +48,15 @@ Never put secrets in `NEXT_PUBLIC_*`. The UI shows only non-secret environment c
 
 ## Register and inspect
 
+QA engineers testing user-launch and OIDC tickets can follow the [short inspector guide](docs/qa-quickstart.md).
+
 1. Serve the inspector at a public HTTPS origin reachable by Campus, or use an HTTPS development tunnel.
 2. Sign in and open **App setup**. Copy the generated registration JSON to an authorized Campus administrator. They perform `POST /admin/campus-apps` in the appropriate authenticated tenant context. The inspector never asks for or stores that admin bearer token.
-3. Save a named profile with its Campus request base, exact issuer, returned `client_id` and optional `installation_id`. Select **Use profile** to activate it for new inspections. Saving a local profile does not register or verify the app. See [saved apps and platforms](docs/saved-profiles.md). The registration JSON includes `campus.webhooks.write` and placeholder `qa.inspection.completed`; no event is sent.
+3. Save a named profile with its Campus request base, exact issuer, returned `client_id` and optional `installation_id`. Select **Use profile** to activate it for new inspections. Saving a local profile does not register or verify the app. See [saved apps and platforms](docs/saved-profiles.md). The registration JSON includes `campus.webhooks.write` and `qa.inspection.completed`; saving setup sends no event.
 4. With the matching saved profile active, call `GET /students/campus-apps/{appId}/launch` with a direct student session, or `GET /admin/campus-apps/{appId}/launch` with a direct administrator session and system-scoped `campus_apps.app.read`. Use the Campus request base and numeric app ID returned by registration, not the client or installation ID. Open the initiation URL returned in `data` in your browser within five minutes. It supplies the user ID and single-use reference automatically through `/oidc/initiate`; no manual reference preparation is needed for a normal launch. See [the QA runbook](docs/qa.md) for advanced fixtures.
 5. Inspect individual checks and technical claims. Signature verification alone does not imply all binding checks passed. Untrusted decoded claims are labeled; identity checks are not run after signature failure.
 6. Run the seven OAuth scenarios. A negative case passes only on the expected rejection. Replay requires a fully verified first bearer token, then reuses the identical assertion. Network, JWKS and fixture prerequisites block the inspection. Rate limits preserve status and numeric rate-limit metadata; requests are never retried.
-7. Open **Request logs** to inspect redacted request/response bodies, HTTP status, timing and safe headers across OAuth, JWKS and OIDC traffic. Run details show correlated entries. See [request logs](docs/request-logs.md).
+7. Open **Request logs** to inspect redacted request/response bodies, HTTP status, timing and safe headers across OAuth, JWKS, OIDC and webhook traffic. Run details show correlated entries. See [request logs](docs/request-logs.md).
 8. Export privacy-safe evidence for QA tickets. Exports omit claims, request context and response bodies. Authenticated history contains only allowlisted technical claims; treat its IDs and roles as sensitive.
 
 Campus rejects private/localhost registered JWKS URLs through its own SSRF policy. Keep TLS and SSRF verification enabled. See [deployment](docs/deployment.md), [architecture](docs/architecture.md), [security and privacy](docs/security.md), and [verification results](docs/qa-results.md).
@@ -76,3 +78,11 @@ Versions were checked against npm and official documentation on 2026-10-22; exac
 Sources: [Node security LTS release](https://nodejs.org/en/blog/release/v24.22.1), [Next route handlers](https://nextjs.org/docs/app/api-reference/file-conventions/route), [standalone output](https://nextjs.org/docs/app/api-reference/config/next-config-js/output), [nonce CSP](https://nextjs.org/docs/app/guides/content-security-policy), [React versions](https://react.dev/versions), [SQLite transactions](https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md), [jose](https://github.com/panva/jose).
 
 `npm audit` currently reports a development-only braces/glob dependency chain in eslint-config-next; no fixed braces version is published. Repository-owned lint patterns are trusted. Production audit is checked separately. Do not force-downgrade the framework to resolve the lint-tool finding.
+
+## Send inbound webhook events
+
+Open **Webhooks playground** after selecting your registered app profile. The installation must permit `campus.webhooks.write` and `qa.inspection.completed`. Click **Send webhook** to acquire and verify a fresh service token, then submit a new event. Each generated envelope uses a fresh ID, current timestamp, the verified token installation and empty `data`.
+
+Choose validation presets or enable **Edit raw event JSON** to send exact text, including malformed JSON. The selected scenario controls the expected status and error field. Raw bodies are not repaired, IDs are not changed, and requests are never automatically retried. Raw-mode reset replaces the envelope with a fresh ID. See [webhook QA](docs/webhooks.md) for limits, evidence and manual backend checks.
+
+Tokens and event bodies are not retained in history, logs or exports. A timeout leaves receipt unknown; check Campus before resending. This tool verifies HTTP behavior, while persistence and audit checks require separate Campus access.

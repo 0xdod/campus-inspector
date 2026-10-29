@@ -73,6 +73,57 @@ export function httpResponseBody(
   if (typeof raw !== "object" || Array.isArray(raw))
     return "[Unrecognized response body omitted]";
   const body = raw as Record<string, unknown>;
+  if (kind === "webhook") {
+    const statuses = new Set([
+      "received",
+      "processed",
+      "failed",
+      "ignored",
+      "Bad Request",
+      "Unauthorized",
+      "Forbidden",
+      "Conflict",
+      "Request Entity Too Large",
+      "Unprocessable Entity",
+      "Too Many Requests",
+      "Internal Server Error",
+    ]);
+    const fields = new Set([
+      "body",
+      "id",
+      "type",
+      "occurred_at",
+      "installation_id",
+      "data",
+      "actor",
+      "actor.sub",
+      "subject",
+      "subject.type",
+      "subject.id",
+      "Authorization",
+      "scope",
+      "rate_limit",
+    ]);
+    return {
+      ...(typeof body.status === "string" && statuses.has(body.status)
+        ? { status: body.status }
+        : {}),
+      ...(Array.isArray(body.errors)
+        ? {
+            errors: body.errors.slice(0, 16).map((error) => {
+              const field =
+                error && typeof error === "object" ? error.field : undefined;
+              return {
+                field: fields.has(field) ? field : "[Field omitted]",
+                message: "Upstream message omitted",
+              };
+            }),
+          }
+        : {}),
+      details:
+        "Event ID, payload and upstream messages omitted; see receipt checks",
+    };
+  }
   if (kind === "jwks") {
     if (!Array.isArray(body.keys)) return { keys: "[Malformed JWKS body]" };
     return {

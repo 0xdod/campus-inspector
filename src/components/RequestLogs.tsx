@@ -120,6 +120,7 @@ export function RequestLogs({ runId }: { runId?: string }) {
             >
               <option value="all">All traffic</option>
               <option value="oauth">OAuth</option>
+              <option value="webhook">Webhook</option>
               <option value="jwks">JWKS</option>
               <option value="oidc">OIDC</option>
             </select>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none" role="img" aria-labelledby="title">
+  <title id="title">Campus Inspector</title>
+  <rect width="128" height="128" rx="30" fill="#14221C"/>
+  <rect x="1" y="1" width="126" height="126" rx="29" stroke="#76DDA6" stroke-opacity=".18" stroke-width="2"/>
+  <path d="m80 80 21 21" stroke="#76DDA6" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="55" cy="55" r="34" fill="#203D2E" stroke="#76DDA6" stroke-width="7"/>
+  <path d="m31 51 24-13 24 13-24 13-24-13Z" fill="#B9F5D3"/>
+  <path d="M41 61v9c8 7 20 7 28 0v-9" stroke="#B9F5D3" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M79 52v15" stroke="#B9F5D3" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="79" cy="70" r="3" fill="#B9F5D3"/>
+</svg>

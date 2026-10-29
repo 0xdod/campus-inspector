@@ -77,6 +77,21 @@ To deploy automatically after publishing, add a repository **Actions variable** 
 
 New GHCR packages are private by default. After the first successful publication, either make the package public in its GitHub package settings for anonymous pulls, or configure a `ghcr.io` registry credential in Dokploy using your GitHub username and a personal access token (classic) with `read:packages` and permission to read this package. Keep this pull credential in Dokploy's registry settings, outside Compose and Git. Organization SSO authorization may also be required. See [GitHub's registry authentication and visibility documentation](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry).
 
+## Free Cloudflare Quick Tunnel on Dokploy
+
+Deploy [compose.tunnel.yaml](../compose.tunnel.yaml) as a separate Compose application. Set `TUNNEL_ORIGIN=http://YOUR_APP_CONTAINER:8090`, replacing the container hostname with the inspector's actual internal service hostname from Dokploy. Set `TUNNEL_NETWORK` to an existing Docker network shared with the inspector; it defaults to `dokploy-network`. The tunnel and app must both be attached to that network. No domain or Cloudflare token is required for this Quick Tunnel.
+
+To start the tunnel with the CLI from the repository root, provide these variables in `.env` or the shell:
+
+```sh
+docker compose -f compose.tunnel.yaml up -d
+docker compose -f compose.tunnel.yaml logs -f cloudflared
+```
+
+Find the generated `https://...trycloudflare.com` URL in the logs. Set the inspector's `PUBLIC_URL` to that origin and redeploy only the inspector, then update its Campus registration URLs. You can start the tunnel before the app is ready to obtain the hostname. No Caddy overlay or Dokploy public domain is needed for this direct container route. The app still uses `ALLOW_LOCAL_HTTP=false`: the HTTP origin connection is internal to Docker, while the browser-facing URL is HTTPS.
+
+Keep this tunnel service separate so ordinary app redeployments do not recreate it. Restarting or recreating `cloudflared` can generate a new hostname; `restart: unless-stopped` restores the process after failure or reboot but does not reserve its hostname. Quick Tunnels are for development/testing and have no uptime guarantee. Do not enable interactive tunnel authentication in front of public JWKS/initiation/callback routes. See [Cloudflare Quick Tunnel documentation](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/).
+
 ## Container behavior and maintenance
 
 Use one replica of the multi-stage image with a persistent named volume mounted at `/data`. The image runs as UID/GID 1000, with a read-only root filesystem, all capabilities dropped and no-new-privileges. Compose supplies writable, size-bounded `/tmp` and `.next/cache` tmpfs mounts. A new Docker named volume inherits the image's `/data` ownership; pre-provisioned/bind-mounted data must be writable by UID 1000. The app sets directory mode 0700, key/database mode 0600. Back up the whole data directory consistently (including SQLite WAL); protect backups like credentials. Replacing this volume changes the app signing key and loses registration/history.

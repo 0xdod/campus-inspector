@@ -72,8 +72,8 @@ export function Setup({
           {message}
         </p>
         <p className="caption">
-          Do not enter Campus admin bearer tokens here. No webhook event is
-          sent.
+          Do not enter Campus admin bearer tokens here. Saving setup sends no
+          webhook event. Use the Webhooks playground to send events explicitly.
         </p>
       </section>
       <div>

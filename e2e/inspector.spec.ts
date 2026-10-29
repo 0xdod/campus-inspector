@@ -7,14 +7,14 @@ async function signin(page: Page) {
     page.getByRole("heading", { name: "Inspect every connection." }),
   ).toBeVisible();
 }
-test("operator setup, real browser form-post, OAuth and redacted export", async ({
+test("operator setup, browser launch, OAuth, webhooks and redacted export", async ({
   page,
   request,
 }) => {
   const errors: string[] = [];
   const apiResponses: Promise<string>[] = [];
   page.on("response", (res) => {
-    if (/\/api\/(history|oauth|bootstrap|logs)/.test(res.url()))
+    if (/\/api\/(history|oauth|webhooks|bootstrap|logs)/.test(res.url()))
       apiResponses.push(res.text());
   });
   page.on("pageerror", (e) => errors.push(e.message));
@@ -82,6 +82,62 @@ test("operator setup, real browser form-post, OAuth and redacted export", async 
   await expect(
     page.getByText("The unchanged assertion must be rejected"),
   ).toBeVisible();
+  await expect(
+    page.getByRole("status", { name: "Inspection result" }),
+  ).toHaveText("passed");
+  await page
+    .getByRole("button", { name: "Webhooks playground", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Send an event to Campus" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Send webhook" }).click();
+  await expect(
+    page.getByRole("status", { name: "Inspection result" }),
+  ).toHaveText("passed");
+  await expect(
+    page.getByText("New event receipt passed", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Webhooks playground", exact: true })
+    .click();
+  await page.getByLabel("Webhook scenario").selectOption("wrong_data_type");
+  await page.getByRole("button", { name: "Send webhook" }).click();
+  await expect(
+    page.getByRole("status", { name: "Inspection result" }),
+  ).toHaveText("passed");
+  await expect(
+    page.getByText("Expected HTTP 400; observed 400", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Webhooks playground", exact: true })
+    .click();
+  await page.getByLabel("Webhook scenario").selectOption("over_limit");
+  await page.getByRole("button", { name: "Send webhook" }).click();
+  await expect(
+    page.getByRole("status", { name: "Inspection result" }),
+  ).toHaveText("passed");
+  await expect(
+    page.getByText("Expected HTTP 413; observed 413", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Webhooks playground", exact: true })
+    .click();
+  await page.getByLabel("Edit raw event JSON").check();
+  await page.screenshot({
+    path: "test-results/webhooks-desktop.png",
+    fullPage: true,
+  });
+  await page.getByLabel("Event envelope").fill(
+    JSON.stringify({
+      id: "browser-" + Date.now(),
+      type: "qa.inspection.completed",
+      occurred_at: new Date().toISOString(),
+      installation_id: "fixture-install",
+      data: { secret: "SENTINEL-BROWSER-PAYLOAD" },
+    }),
+  );
+  await page.getByRole("button", { name: "Send webhook" }).click();
   await expect(
     page.getByRole("status", { name: "Inspection result" }),
   ).toHaveText("passed");
@@ -155,6 +211,7 @@ test("mobile layout, keyboard sign-in, empty/loading states and sign-out", async
     "Saved apps",
     "Launch inspector",
     "OAuth playground",
+    "Webhooks playground",
     "Run history",
     "Request logs",
   ]) {
@@ -219,6 +276,19 @@ test("HTTP transport errors, methods, CSRF and uncached security headers", async
     "x-csrf-token": boot.csrf,
     "content-type": "application/json",
   };
+  expect(
+    (
+      await request.post("/api/webhooks", { data: { scenario: "valid" } })
+    ).status(),
+  ).toBe(401);
+  expect(
+    (
+      await page.request.post("/api/webhooks", { data: { scenario: "valid" } })
+    ).status(),
+  ).toBe(403);
+  const webhookMethod = await page.request.get("/api/webhooks");
+  expect(webhookMethod.status()).toBe(405);
+  expect(webhookMethod.headers().allow).toBe("POST");
   const malformed = await page.request.put("/api/registration", {
     headers,
     data: "{bad",

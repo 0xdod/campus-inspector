@@ -13,6 +13,7 @@ import {
 import { bodyJSON, fail, handle, json, textID } from "./http";
 import { startLaunch, launchSchema } from "./launches/launch";
 import { oauthSchema, runOAuth } from "./oauth/scenarios";
+import { webhookSchema, runWebhook } from "./webhooks/scenarios";
 import { jwksObservation } from "./crypto/verify";
 import { saveProfile, saveRegistrationProfile } from "./profiles/service";
 import { exportEvidence } from "./evidence/redaction";
@@ -39,6 +40,7 @@ const methods: Record<string, string[]> = {
   evidence: ["GET"],
   launch: ["POST"],
   oauth: ["POST"],
+  webhooks: ["POST"],
 };
 export function api(req: Request) {
   return handle(async () => {
@@ -193,6 +195,12 @@ export function api(req: Request) {
       return json({
         redirectUrl: startLaunch(c, s, launchSchema.parse(await bodyJSON(req))),
       });
+    }
+    if (path === "webhooks") {
+      quota(s, "operator-webhooks", 10);
+      // The control wrapper can expand escaped raw JSON by up to six bytes per character.
+      const input = webhookSchema.parse(await bodyJSON(req, 2 * 1024 * 1024));
+      return json(await runWebhook(c, s, keys, input));
     }
     if (path === "oauth") {
       quota(s, "operator-oauth", 10);

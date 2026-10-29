@@ -117,3 +117,25 @@ it("retains at most 500 logs and excludes expired entries", () => {
     { count: 0 },
   );
 });
+
+it("omits arbitrary webhook response fields, reflected payloads and error descriptions", () => {
+  const safe = httpResponseBody(
+    {
+      id: "SENTINEL-ID",
+      status: "received",
+      message: "SENTINEL-MESSAGE",
+      data: { secret: "SENTINEL-PAYLOAD" },
+      access_token: "SENTINEL-TOKEN",
+      errors: [
+        { field: "data", message: "SENTINEL-ERROR" },
+        { field: "SENTINEL-FIELD", message: "private" },
+      ],
+    },
+    "webhook",
+  );
+  expect(safe).toMatchObject({
+    status: "received",
+    errors: [{ field: "data" }, { field: "[Field omitted]" }],
+  });
+  expect(JSON.stringify(safe)).not.toContain("SENTINEL");
+});

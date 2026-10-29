@@ -27,3 +27,7 @@ Evidence export remains a privacy-safe run summary and does not include these re
 `GET /api/logs` returns bounded summaries. `GET /api/logs?run_id=<id>` filters them to one inspection. `GET /api/logs/<id>` returns the full redacted entry. All require the operator session and return no-store responses. Invalid IDs return 400, absent/expired entries 404, and unsupported methods 405 with Allow.
 
 Schema migration `003_http_logs.sql` adds a table/index without replacing existing profiles, history, sessions or keys. Restart once after updating to load the migration into the cached server runtime; rebuild and restart production normally.
+
+## Webhook traffic
+
+Webhook runs correlate token, JWKS and event requests under one run/profile snapshot. Event logs retain outgoing byte counts and a redacted-envelope marker; authorization and raw envelope text are never persisted. Response event IDs, payloads and upstream messages are omitted; recognized statuses and allowlisted error fields remain. Exports omit full response bodies as before. Generated server-controlled event IDs are available only in run request metadata, which exports exclude. An unavailable webhook response means receipt is unknown and no retry was attempted.
