@@ -48,6 +48,8 @@ Never put secrets in `NEXT_PUBLIC_*`. The UI shows only non-secret environment c
 
 ## Register and inspect
 
+QA engineers testing user-launch and OIDC tickets can follow the [short inspector guide](docs/qa-quickstart.md).
+
 1. Serve the inspector at a public HTTPS origin reachable by Campus, or use an HTTPS development tunnel.
 2. Sign in and open **App setup**. Copy the generated registration JSON to an authorized Campus administrator. They perform `POST /admin/campus-apps` in the appropriate authenticated tenant context. The inspector never asks for or stores that admin bearer token.
 3. Save a named profile with its Campus request base, exact issuer, returned `client_id` and optional `installation_id`. Select **Use profile** to activate it for new inspections. Saving a local profile does not register or verify the app. See [saved apps and platforms](docs/saved-profiles.md). The registration JSON includes `campus.webhooks.write` and `qa.inspection.completed`; saving setup sends no event.
